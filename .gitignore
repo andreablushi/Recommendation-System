@@ -4,6 +4,9 @@
 # venv folder
 /.venv/
 
+# ipynb checkpoints
+/src/__pycache__/
+
 # Object files
 */obj/
 */dep/
