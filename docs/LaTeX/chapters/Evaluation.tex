@@ -72,7 +72,7 @@ This improvement suggests that longer prefixes provide substantially more discri
 
 The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:confusion_matrix_10} provide further insight into the distribution of predictions and misclassifications.
 
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \begin{minipage}[t]{0.45\textwidth}
         \centering
@@ -126,12 +126,41 @@ The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:conf
 
 \subsection{Recommendation Analysis}
 
-\subsubsection{Recommendation Generation}
-For the sake of simplicity in explaining the recommendation extraction process, we chose to use a tree structure that, while not optimal, has a smaller depth.
-%#TODO: rewrite
+\paragraph{Recommendation Generation}
+For the sake of simplicity in explaining the recommendation extraction process, we chose to consider the tree in Figure~\ref{fig:decision_tree_recommendation} that, while not optimal, has a smaller depth.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../media/decision_tree_small.png}
+    \caption{Simplified decision tree used to illustrate the recommendation extraction process.
+    Given a node, the left child branch is taken if the condition is true (activity is absent in the trace), while the right child branch is taken if the condition is false (activity is present in the trace).}
+    \label{fig:decision_tree_recommendation}
+\end{figure}
+Applying the extraction of positive paths (Algorithm~\ref{alg:get_positive_paths}) to this tree, we obtain the following positive paths with their confidence scores:
+\begin{itemize}
+    \item Path 1: \textit{Turning Q.C.} = F $\wedge$ \textit{Grinding Rework - Machine 27} = F $\wedge$ \textit{Turning - Machine 9} = F $\wedge$ \textit{Turning \& Milling Q.C.} = F with confidence $0.77$;
+    \item Path 2: \textit{Turning Q.C.} = F $\wedge$ \textit{Grinding Rework - Machine 27} = F $\wedge$ \textit{Turning - Machine 9} = T with confidence $0.80$;
+    \item Path 3: \textit{Turning Q.C.} = T $\wedge$ \textit{Turning \& Milling - Machine 10} = F $\wedge$ \textit{Final Inspection Q.C.} = F $\wedge$ \textit{Packing} = T with confidence $1.0$;
+    \item Path 4: \textit{Turning Q.C.} = T $\wedge$ \textit{Turning \& Milling - Machine 10} = T with confidence $1.0$;
+\end{itemize}
+Now, suppose a prefix trace that has the following activities: \{\textit{Final Inspection Q.C.}: True, \textit{Packing}: True, \textit{Grinding Rework - Machine 27}: True\}, represented by the orange path in Figure~\ref{fig:decision_tree_recommendation} is predicted as false.
+To find the recommendations for this trace, we first filter the positive paths to find the compliant ones.
+\begin{itemize}
+    \item Path 1 and Path 2 are not compliant because they require \textit{Grinding Rework - Machine 27} = F, which is violated by the trace;
+    \item Path 3 is compliant because none of its conditions are violated by the trace;
+    \item Path 4 is also not compliant because it requires \textit{Final Inspection Q.C.} = F, which is violated by the trace.
+\end{itemize}
+Given this, we can derive the recommendations for the given prefix trace as the activities that need to be added to follow Path 3.
+Since both \textit{Turning Q.C.} and \textit{Turning \& Milling - Machine 10} need to be true to follow Path 3, the recommended activities will be them.
+This is illustrated in Figure~\ref{fig:recommendation_tree}, with the green dotted nodes.
 
-\subsubsection{Recommendations Quality}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../media/recommendation_tree.png}
+    \caption{The blue squared nodes represent the activities present in the given prefix trace. The green highlighted node represent the recommended activities}
+    \label{fig:recommendation_tree}
+\end{figure}
 
+\paragraph{Recommendations Quality}
 Tables~\ref{tab:evaluation_metrics_rec_5} and~\ref{tab:evaluation_metrics_rec_10} present the evaluation of our recommendation system's ability to suggest activities that would lead cases toward positive outcomes. 
 This values have to be considered as an approximation, since the ground truth is based on actual traces rather than hypothetical scenarios where recommendations were followed.
 At $\textit{prefix\_length}=5$, the recommendation system achieves a balanced accuracy like the classifier, with all metrics around 78\%. 

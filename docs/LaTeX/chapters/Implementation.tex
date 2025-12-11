@@ -60,6 +60,7 @@ To extract the positive paths from the decision tree, we traversed the tree stru
 At each node in the path, we record the feature and the boolean condition (true or false) that leads to the next node.
 When we reach a leaf node, we check if it corresponds to a positive outcome. If it does, we store the entire path taken to reach that leaf, with the associated confidence score, as a positive path.
 \begin{algorithm}[H]
+    \label{alg:get_positive_paths}
     \caption{Get Positive Paths}
     \begin{algorithmic}[1]
     \Function{GetPositivePaths}{node, current\_path, positive\_paths}

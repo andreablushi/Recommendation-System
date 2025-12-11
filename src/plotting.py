@@ -1,10 +1,11 @@
 from matplotlib import pyplot as plot
+import matplotlib.patches as mpatches
 import sklearn.tree as tree
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 
-def plot_decision_tree(clf : DecisionTreeClassifier, activity_names:list, save:bool=False):
+def plot_decision_tree(clf : DecisionTreeClassifier, activity_names:list, save:bool=False, path:str="docs/media/decision_tree.png"):
     """
     Plot the decision tree with confidence levels (probability of positive class) shown.
     
@@ -26,10 +27,103 @@ def plot_decision_tree(clf : DecisionTreeClassifier, activity_names:list, save:b
 
     # Optionally save the figure
     if save:
-        plot.savefig("docs/media/decision_tree.png", bbox_inches='tight')
+        plot.savefig(path, bbox_inches='tight')
     plot.show()
 
-def plot_confusion_matrix(true_labels: list, predicted_labels: list, save: bool=False): 
+def plot_recommendation_on_tree(clf: DecisionTreeClassifier, 
+                                activity_names: list, 
+                                prefix_trace_features: set, 
+                                recommended_conditions: set, 
+                                save: bool = False, 
+                                path: str = "docs/media/recommendation_tree.png"):
+    """
+    Plot the decision tree with recommendations highlighted.
+    
+    Parameters:
+        clf: DecisionTreeClassifier
+        activity_names: List of feature names
+        prefix_trace_features: Set of activity names in the prefix trace
+        recommended_conditions: Set of (activity_name, value) tuples for recommendations
+        save: Whether to save the plot as PNG
+        path: Path to save the plot
+    """
+    print(f"Prefix trace features: {prefix_trace_features}")
+    print(f"Recommended conditions: {recommended_conditions}")
+    # Create figure
+    fig = plot.figure(figsize=(30, 20))
+    ax = plot.gca()
+
+    # Plot the basic decision tree
+    tree_plot = tree.plot_tree(
+        clf,
+        feature_names=activity_names,
+        filled=True,
+        rounded=True,
+        proportion=True,
+        label='all',
+    )
+    
+    # For each node in the tree
+    for i, node in enumerate(tree_plot):
+        if hasattr(node, 'get_text'):
+            # Get node text and bbox
+            node_text = node.get_text()
+            bbox = node.get_bbox_patch()
+            if bbox is None:
+                continue
+            
+            # Check if the node corresponds to a feature in the prefix trace
+            is_in_prefix = any(feature in node_text for feature in prefix_trace_features)
+            
+            # Check if node contains a recommended condition
+            is_recommended = False
+            for feat, val in recommended_conditions:
+                if feat in node_text:
+                    is_recommended = True
+                    break
+            
+            if is_in_prefix:
+                # Node is in prefix trace: thick blue border
+                bbox.set_edgecolor('blue')
+                bbox.set_linewidth(6)
+                bbox.set_linestyle('-')
+            elif is_recommended:
+                # Node is recommended: thick dashed green border
+                bbox.set_edgecolor('green')
+                bbox.set_linewidth(6)
+                bbox.set_linestyle('--')
+    
+    # Create legend
+    legend_elements = []
+    legend_elements.append(
+        mpatches.Patch(facecolor='lightblue', edgecolor='blue', 
+                        linewidth=4, label=f'Prefix Trace ({len(prefix_trace_features)} features)')
+    )
+    legend_elements.append(
+        mpatches.Patch(facecolor='lightgreen', edgecolor='green', 
+                        linewidth=4, linestyle='--', 
+                        label=f'Recommendations ({len(recommended_conditions)} conditions)')
+    )
+    ax.legend(handles=legend_elements, loc='upper right', fontsize=20,
+        frameon=True, shadow=True)
+    
+    # Add title with summary
+    title = 'Decision Tree with Trace Prefix and Recommendations'
+    if prefix_trace_features or recommended_conditions:
+        title += f'\n[Prefix: {len(prefix_trace_features)} features | '
+        title += f'Recommendations: {len(recommended_conditions)} conditions]'
+    plot.title(title, fontsize=24, pad=20, fontweight='bold')
+    
+    plot.tight_layout()
+    
+    # Save if requested
+    if save:
+        plot.savefig(path, bbox_inches='tight', dpi=150)
+        print(f"Tree visualization saved to: {path}")
+    
+    plot.show()
+
+def plot_confusion_matrix(true_labels: list, predicted_labels: list, save: bool=False, path:str="docs/media/confusion_matrix.png"): 
     '''
         Plot the confusion matrix using matplotlib.
         Parameters:
@@ -38,7 +132,7 @@ def plot_confusion_matrix(true_labels: list, predicted_labels: list, save: bool=
     '''
     cm_display = ConfusionMatrixDisplay.from_predictions(true_labels, predicted_labels, cmap=plot.cm.Blues)
     if save:
-        cm_display.figure_.savefig("docs/media/confusion_matrix.png")
+        cm_display.figure_.savefig(path)
 
 def compute_all_metrics(true_labels: list, predicted_labels: list):
     '''
