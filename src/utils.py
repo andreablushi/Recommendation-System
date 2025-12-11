@@ -402,7 +402,7 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
     
     # Calculate metrics
     total_predictions = true_positives + true_negatives + false_positives + false_negatives
-    logging.debug(f"Total predictions: {total_predictions}")
+    print(f"Total predictions: {total_predictions}")
     # Calculate metrics
     precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
     recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
