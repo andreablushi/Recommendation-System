@@ -1,50 +1,149 @@
 \section{Evaluation}
+In this section, we present the evaluation results, for both $\textit{prefix\_length}=5$ and $\textit{prefix\_length}=10$, of the decision tree classifier and the recommendation system built on top of it.
+
 \subsection{Hyperparameters}
+Tables~\ref{tab:hyperparameters_5} and~\ref{tab:hyperparameters_10} show the optimized hyperparameters obtained through \textit{Hyperopt} for both prefix lengths. 
+Both configurations use entropy as the splitting criterion, which measures information gain and tends to create more balanced trees. 
+The max depth parameters (17 and 15 respectively) prevent overfitting while allowing sufficient model complexity to capture the underlying patterns. 
+Note that the model for $\textit{prefix\_length}=10$ uses only 1 max feature, suggesting that at longer prefix lengths, individual activities become more discriminative for prediction.
+
+\begin{table}[ht]
+    \centering
+    \begin{minipage}[t]{0.45\textwidth}
+        \centering
+        \begin{tabular}{l c}
+            \hline
+            \textbf{Hyperparameter} & \textbf{Value} \\
+            \hline
+            Criterion & Entropy \\
+            Max Depth & 17 \\
+            Max Features & 3 \\
+            \hline
+        \end{tabular}
+        \caption{Optimized hyperparameters for the decision tree classifier for $\textit{prefix\_length}=5$.}
+        \label{tab:hyperparameters_5}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.45\textwidth}
+        \centering
+        \begin{tabular}{l c}
+            \hline
+            \textbf{Hyperparameter} & \textbf{Value} \\
+            \hline
+            Criterion & Entropy \\
+            Max Depth & 15 \\
+            Max Features & 1 \\
+            \hline
+        \end{tabular}
+        \caption{Optimized hyperparameters for the decision tree classifier for $\textit{prefix\_length}=10$.}
+        \label{tab:hyperparameters_10}
+    \end{minipage}
+\end{table}
+
+
 \subsection{Decision Tree Structure}
+
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\textwidth]{../media/decision_tree.png}
-    \caption{Visualization of the trained decision tree classifier. Each node represents a decision based on the presence or absence of specific activities, leading to recommendations at the leaf nodes.}
-    \label{fig:decision_tree}
+    \includegraphics[width=0.8\textwidth]{../media/decision_tree_5.png}
+    \caption{Visualization of the trained decision tree classifier for $\textit{prefix\_length}=5$. Each node represents a decision based on the presence or absence of specific activities, leading to recommendations at the leaf nodes.}
+    \label{fig:decision_tree_5}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../media/decision_tree_10.png}
+    \caption{Visualization of the trained decision tree classifier for $\textit{prefix\_length}=10$. }
+    \label{fig:decision_tree_10}
 \end{figure}
 
 \subsubsection{Evaluation Metrics}
-\begin{figure}[H]
+\begin{figure}[ht]
     \centering
-    \includegraphics[width=0.6\textwidth]{../media/confusion_matrix.png}
-    \caption{Confusion matrix for the decision tree classifier's performance on the test set.}
-    \label{fig:confusion_matrix}
+    \begin{minipage}[t]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../media/confusion_matrix_5.png}
+        \caption{Evaluation metrics for the decision tree classifier's performance on the test set ($\textit{prefix\_length}=5$).}
+        \label{fig:decision_tree_metrics1}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../media/confusion_matrix_10.png}
+        \caption{Evaluation metrics for the decision tree classifier's performance on the test set ($\textit{prefix\_length}=10$).}
+        \label{fig:decision_tree_metrics2}
+    \end{minipage}
 \end{figure}
+
 \begin{table}[H]
     \centering
-    \begin{tabular}{l c}
-        \hline
-        \textbf{Metric} & \textbf{Value} \\
-        \hline
-        Accuracy & 85\% \\
-        Precision & 82\% \\
-        Recall & 83\% \\
-        F1-Score & 85\% \\
-        \hline
-    \end{tabular}
-    \caption{Evaluation metrics for the decision tree classifier on the test set.}
-    \label{tab:evaluation_metrics}
+    \begin{minipage}[t]{0.45\textwidth}
+        \centering
+        \begin{tabular}{l c}
+            \hline
+            \textbf{Metric} & \textbf{Value} \\
+            \hline
+            Accuracy & 72.09\% \\
+            Precision & 73.82\% \\
+            Recall & 72.09\% \\
+            F1-Score & 72.81\% \\
+            \hline
+        \end{tabular}
+        \caption{Evaluation metrics for the decision tree classifier on the test set for $\textit{prefix\_length}=5$.}
+        \label{tab:evaluation_metrics}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.45\textwidth}
+        \centering
+        \begin{tabular}{l c}
+            \hline
+            \textbf{Metric} & \textbf{Value} \\
+            \hline
+            Accuracy & 79.07\% \\
+            Precision & 78.49\% \\
+            Recall & 79.07\% \\
+            F1-Score & 78.73\% \\
+            \hline
+        \end{tabular}
+        \caption{Evaluation metrics for the decision tree classifier on the test set for $\textit{prefix\_length}=10$.}
+        \label{tab:evaluation_metrics}
+    \end{minipage}
 \end{table}
+
 \subsection{Recommendation Analysis}
 
 \subsubsection{Recommendations Quality}
 \begin{table}[H]
     \centering
-    \begin{tabular}{l c}
-        \hline
-        \textbf{Metric} & \textbf{Value} \\
-        \hline
-        Accuracy & 80\% \\
-        Precision & 78\% \\
-        Recall & 79\% \\
-        F1-Score & 80\% \\
-        \hline
-    \end{tabular}
-    \caption{Evaluation metrics for the recommendation system}
-    \label{tab:recommendation_metrics}
+    \begin{minipage}[t]{0.45\textwidth}
+        \centering
+        \begin{tabular}{l c}
+            \hline
+            \textbf{Metric} & \textbf{Value} \\
+            \hline
+            Accuracy & 78.12\% \\
+            Precision & 78.12\% \\
+            Recall & 78.12\% \\
+            F1-Score & 67.44\% \\
+            \hline
+        \end{tabular}
+        \caption{Evaluation metrics for the recommendation system on the test set for $\textit{prefix\_length}=5$.}
+        \label{tab:evaluation_metrics}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.45\textwidth}
+        \centering
+        \begin{tabular}{l c}
+            \hline
+            \textbf{Metric} & \textbf{Value} \\
+            \hline
+            Accuracy & 78.95\% \\
+            Precision & 93.75\% \\
+            Recall & 85.71\% \\
+            F1-Score & 76.74\% \\
+            \hline
+        \end{tabular}
+        \caption{Evaluation metrics for the recommendation system on the test set for $\textit{prefix\_length}=10$.}
+        \label{tab:evaluation_metrics}
+    \end{minipage}
 \end{table}

@@ -26,6 +26,8 @@ After encoding the pruned event log, a decision tree classifier was trained usin
 We split the encoded log into features (by removing the trace identifier and label columns from the original encoding) and labels, which were the ground truth extracted directly from the log.  
 The \textit{XES} file was already partitioned into separate training and testing sets; we used these to train and evaluate the classifier, respectively.
 
+After training the classifier, it's possible to visualize the learned decision rules by plotting the decision tree using built-in \textit{scikit-learn} functionality.  
+
 \subsection{Optimizing the Classifier hyperparameters}
 To enhance the performance of our decision tree classifier, we employed the \textit{Hyperopt} library to perform hyperparameter optimization.
 This tool systematically iterates through various combinations of hyperparameters, such as maximum tree depth, maximum features, and criterion (e.g., Gini or entropy), to identify the configuration that yields the optimal performance.
