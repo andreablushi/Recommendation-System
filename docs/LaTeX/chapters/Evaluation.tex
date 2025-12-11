@@ -1,1 +1,50 @@
 \section{Evaluation}
+\subsection{Hyperparameters}
+\subsection{Decision Tree Structure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../media/decision_tree.png}
+    \caption{Visualization of the trained decision tree classifier. Each node represents a decision based on the presence or absence of specific activities, leading to recommendations at the leaf nodes.}
+    \label{fig:decision_tree}
+\end{figure}
+
+\subsubsection{Evaluation Metrics}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{../media/confusion_matrix.png}
+    \caption{Confusion matrix for the decision tree classifier's performance on the test set.}
+    \label{fig:confusion_matrix}
+\end{figure}
+\begin{table}[H]
+    \centering
+    \begin{tabular}{l c}
+        \hline
+        \textbf{Metric} & \textbf{Value} \\
+        \hline
+        Accuracy & 85\% \\
+        Precision & 82\% \\
+        Recall & 83\% \\
+        F1-Score & 85\% \\
+        \hline
+    \end{tabular}
+    \caption{Evaluation metrics for the decision tree classifier on the test set.}
+    \label{tab:evaluation_metrics}
+\end{table}
+
+\subsection{Recommendations Quality}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{l c}
+        \hline
+        \textbf{Metric} & \textbf{Value} \\
+        \hline
+        Accuracy & 80\% \\
+        Precision & 78\% \\
+        Recall & 79\% \\
+        F1-Score & 80\% \\
+        \hline
+    \end{tabular}
+    \caption{Evaluation metrics for the recommendation system}
+    \label{tab:recommendation_metrics}
+\end{table}

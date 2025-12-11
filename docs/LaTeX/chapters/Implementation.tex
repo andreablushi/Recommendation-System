@@ -1,12 +1,12 @@
 \section{Implementation}
 
 We implemented a recommendation system using a decision tree classifier to analyze production event logs.
-The implementation was achieved using Python, leveraging libraries such as \text{PM4Py} for process mining tasks and \text{scikit-learn} for machine learning functionalities.
+The implementation was achieved using Python, leveraging libraries such as \textit{PM4Py} for process mining tasks and \textit{scikit-learn} for machine learning functionalities.
 The execution flow of our implementation resides within the \textit{notebook.ipynb} file, which calls all the designed functions in \textit{utils.py}.
 
 \subsection{Encoding the Event Log}
 
-We began by importing the event log file, which is in \text{XES} format, using the PM4Py library. 
+We began by importing the event log file, which is in \textit{XES} format, using the PM4Py library. 
 We then converted this file into a PM4Py event log object suitable for subsequent process mining tasks.
 
 Then, we created a copy of the event log, in order to cut to the first \textit{prefix\_length} events of each trace.
@@ -22,16 +22,37 @@ We implemented the padding of traces, in case of traces shorter than the specifi
 Upon completion, we obtained a DataFrame where each row represented a trace and the feature columns indicated the presence or absence of specific activities within that trace.
 
 \subsection{Training the Decision Tree Classifier}
-After encoding the event log, we trained a decision tree classifier using the \textsc{scikit-learn} library.  
+After encoding the event log, we trained a decision tree classifier using the \textit{scikit-learn} library.  
 We split the encoded log into features (by removing the trace identifier and label columns) and labels, which were the ground truth extracted directly from the log.  
-The \text{XES} file was already partitioned into separate training and testing sets; we used these to train and evaluate the classifier, respectively.
+The \textit{XES} file was already partitioned into separate training and testing sets; we used these to train and evaluate the classifier, respectively.
 
 The testing set was encoded with the same Boolean encoding described earlier.  
-After evaluating the classifier on the test set, we visualized the learned decision rules by plotting the decision tree using built-in \textsc{scikit-learn} functionality.  
-We further assessed performance by generating the confusion matrix (also provided by \textsc{scikit-learn}) and computing accuracy, precision, recall, and F1-score.
+After evaluating the classifier on the test set, we visualized the learned decision rules by plotting the decision tree using built-in \textit{scikit-learn} functionality.  
+We further assessed performance by generating the confusion matrix (also provided by \textit{scikit-learn}) and computing accuracy, precision, recall, and F1-score.
 
 \subsection{Optimizing the Classifier Parameters}
+To enhance the performance of our decision tree classifier, we employed the \textit{Hyperopt} library to perform hyperparameter optimization.
+This tool systematically iterates through various combinations of hyperparameters, such as maximum tree depth, maximum features, and criterion (e.g., Gini or entropy), to identify the configuration that yields the optimal performance.
+At every iteration, the model was trained and evaluated using the $F_1$-score as the primary performance metric. 
+Only the configuration that resulted in the highest $F_1$-score was retained for the final model.
+
+The Hyperopt library also allows us to define a search space and to specify the maximum number of iterations to perform.
 
 \subsection{Extracting Recommendations}
 
 \subsection{Evaluation of Recommendations}
+To evaluate the quality of the recommendations generated, we compared them against the actual traces in the test set, where the encoded test set served as the ground truth for comparison.
+
+For each complete trace in the test set, we first checked if the trace's prefix matched the specific conditions (the features present) leading to a particular recommendation as defined by the decision tree classifier.
+Only if a prefix match occurred, we then proceeded to check if the recommended activity was actually performed in the subsequent step of the actual trace following that prefix.
+This recommendation outcome was then compared with the ground truth outcome of the trace to determine the predictive accuracy of the recommendation.
+
+With those checks we can create an approximated confusion matrix, where:
+\begin{itemize}
+    \item True Positives: The recommended activity was followed in the actual trace, and the ground truth outcome is positive.
+    \item False Positives: The recommended activity was not followed in the actual trace, but the ground truth outcome is positive.
+    \item True Negatives: The recommended activity was not followed in the actual trace, and the ground truth outcome is negative.
+    \item False Negatives: The recommended activity was followed in the actual trace, but the ground truth outcome is negative.
+\end{itemize}
+
+Starting from this confusion matrix, we computed standard evaluation metrics such as accuracy, precision, recall, and F1-score to assess the effectiveness of the recommendations provided by our system.
