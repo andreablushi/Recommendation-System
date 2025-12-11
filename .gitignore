@@ -50,3 +50,5 @@ notes/
 idea/
 
 .ipynb_checkpoints/notebook-checkpoint.ipynb
+logs/Production_avg_dur_testing_80-100.xes
+logs/Production_avg_dur_training_0-80.xes

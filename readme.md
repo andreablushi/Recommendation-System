@@ -17,11 +17,12 @@ The project was developed as part of the course "Process Mining and Management",
 - **src/**:  Source code modules
    - **utils.py**: Core utilities (log processing, encoding, hyperparameter optimization)
    - **plotting.py**: Visualization functions (decision trees, confusion matrices, metrics)
-- **logs/**: Event log files (XES format)
+- **logs/**: Event log  compressed files (XES format)
 - **docs/**: Documentation and outputs
    - **media/**: Generated visualizations
    - **LaTeX/**: LaTeX report files
    - **report.pdf**: Final report of the project (PDF)
+- **app.log**: Application log file
 - **notebook.ipynb**: Main Jupyter Notebook for experiments
 - **requirements.txt**: Python dependencies
 
@@ -44,9 +45,12 @@ To install and set up the project, follow these steps:
    ```bash
    pip install -r requirements.txt
    ```
-
-4. Run the Jupyter Notebook:
+4. Extract the event logs from the `logs/` directory:
+   ```bash
+      unzip 'logs/*.zip' -d logs/
+   ```
+5. Run the Jupyter Notebook:
    ```bash
    jupyter notebook
    ```
-5. Open `notebook.ipynb` in your browser to start working with the project.
+6. Open `notebook.ipynb` in your browser to start working with the project.
