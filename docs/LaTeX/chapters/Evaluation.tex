@@ -42,6 +42,10 @@ Note that the model for $\textit{prefix\_length}=10$ uses only 1 max feature, su
 
 
 \subsection{Decision Tree Structure}
+Figures~\ref{fig:decision_tree_5} and~\ref{fig:decision_tree_10} illustrate the structure of the trained decision trees.
+The color-coded leaf nodes (blue for positive outcomes, orange for negative outcomes) clearly show the distribution of predictions across different decision paths. 
+Both trees maintain interpretability despite their depth, as the controlled max depth parameters prevent excessive branching.
+The tree structures provide valuable insights into which activities and activity combinations are most discriminative for predicting case outcomes, making the model transparent.
 
 \begin{figure}[H]
     \centering
@@ -58,20 +62,30 @@ Note that the model for $\textit{prefix\_length}=10$ uses only 1 max feature, su
 \end{figure}
 
 \subsubsection{Evaluation Metrics}
+
+The classification results in Tables~\ref{tab:evaluation_metrics_5} and~\ref{tab:evaluation_metrics_10} demonstrate the predictive performance of our decision tree models. 
+For $\textit{prefix\_length}=5$, the model achieves balanced results around the $70\%$ for all considered metrics. 
+This indicates reasonable performance given that the model has access to only the first 5 activities of each case.
+
+The performance improves significantly at $\textit{prefix\_length}=10$.
+This improvement suggests that longer prefixes provide substantially more discriminative information for predicting case outcomes. 
+
+The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:confusion_matrix_10} provide further insight into the distribution of predictions and misclassifications.
+
 \begin{figure}[ht]
     \centering
     \begin{minipage}[t]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{../media/confusion_matrix_5.png}
         \caption{Evaluation metrics for the decision tree classifier's performance on the test set ($\textit{prefix\_length}=5$).}
-        \label{fig:decision_tree_metrics1}
+        \label{fig:confusion_matrix_5}
     \end{minipage}
     \hfill
     \begin{minipage}[t]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{../media/confusion_matrix_10.png}
         \caption{Evaluation metrics for the decision tree classifier's performance on the test set ($\textit{prefix\_length}=10$).}
-        \label{fig:decision_tree_metrics2}
+        \label{fig:confusion_matrix_10}
     \end{minipage}
 \end{figure}
 
@@ -90,7 +104,7 @@ Note that the model for $\textit{prefix\_length}=10$ uses only 1 max feature, su
             \hline
         \end{tabular}
         \caption{Evaluation metrics for the decision tree classifier on the test set for $\textit{prefix\_length}=5$.}
-        \label{tab:evaluation_metrics}
+        \label{tab:evaluation_metrics_5}
     \end{minipage}
     \hfill
     \begin{minipage}[t]{0.45\textwidth}
@@ -106,13 +120,27 @@ Note that the model for $\textit{prefix\_length}=10$ uses only 1 max feature, su
             \hline
         \end{tabular}
         \caption{Evaluation metrics for the decision tree classifier on the test set for $\textit{prefix\_length}=10$.}
-        \label{tab:evaluation_metrics}
+        \label{tab:evaluation_metrics_10}
     \end{minipage}
 \end{table}
 
 \subsection{Recommendation Analysis}
 
+\subsubsection{Recommendation Generation}
+For the sake of simplicity in explaining the recommendation extraction process, we chose to use a tree structure that, while not optimal, has a smaller depth.
+%#TODO: rewrite
+
 \subsubsection{Recommendations Quality}
+
+Tables~\ref{tab:evaluation_metrics_rec_5} and~\ref{tab:evaluation_metrics_rec_10} present the evaluation of our recommendation system's ability to suggest activities that would lead cases toward positive outcomes. 
+This values have to be considered as an approximation, since the ground truth is based on actual traces rather than hypothetical scenarios where recommendations were followed.
+At $\textit{prefix\_length}=5$, the recommendation system achieves a balanced accuracy like the classifier, with all metrics around 78\%. 
+This indicates that even with limited information from shorter prefixes, the system can provide reasonably accurate recommendations.
+
+The recommendation system shows marked improvement at $\textit{prefix\_length}=10$.
+Most notably, the precision increases dramatically to 93.75\%, indicating that when the system makes recommendations, they are highly likely to be correct. 
+This strong performance, particularly the high precision at $\textit{prefix\_length}=10$, suggests that the recommendation system can be reliably deployed to guide ongoing cases toward positive outcomes. 
+
 \begin{table}[H]
     \centering
     \begin{minipage}[t]{0.45\textwidth}
@@ -128,7 +156,7 @@ Note that the model for $\textit{prefix\_length}=10$ uses only 1 max feature, su
             \hline
         \end{tabular}
         \caption{Evaluation metrics for the recommendation system on the test set for $\textit{prefix\_length}=5$.}
-        \label{tab:evaluation_metrics}
+        \label{tab:evaluation_metrics_rec_5}
     \end{minipage}
     \hfill
     \begin{minipage}[t]{0.45\textwidth}
@@ -144,6 +172,6 @@ Note that the model for $\textit{prefix\_length}=10$ uses only 1 max feature, su
             \hline
         \end{tabular}
         \caption{Evaluation metrics for the recommendation system on the test set for $\textit{prefix\_length}=10$.}
-        \label{tab:evaluation_metrics}
+        \label{tab:evaluation_metrics_rec_10}
     \end{minipage}
 \end{table}
