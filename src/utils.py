@@ -314,79 +314,105 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
             if feat not in prefix_trace_features
         }
 
-        recommendation[row['trace_id']] = missing_conditions
-        print(f"Prefix Trace: {set(prefix_trace_features.keys())} -> Recommended Activities: {missing_conditions}")
+        recommendation[frozenset(prefix_trace_features)] = missing_conditions
 
     for k, v in recommendation.items():
         logging.debug(f"Prefix Trace: {set(k)} -> Recommended Activities: {v}")
     
     return recommendation
         
-def evaluate_recommendations(test_set:pd.DataFrame, recommendations: dict) -> dict:
+def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> dict:
     """
-    Evaluate the recommendations against the test set.
-    test_set must be an EventLog.
-    recommendations maps trace_id -> set of (feature, boolean).
+        Evaluate the recommendations against the test set.
+            Parameters:
+                test_set (pd.DataFrame): The boolean encoded test set (full traces).
+                recommendations (dict): A dictionary mapping prefix trace features (frozenset) 
+                                    to a set of recommended activities.
+            Returns:
+                dict: A dictionary containing evaluation metrics
     """
-
-    true_positive = 0
-    false_positive = 0
-    true_negative = 0
-    false_negative = 0
-
-    for _, row in test_set.iterrows():
-        trace_id = row["trace_id"]
-        ground_truth = row["label"]
-
-        # Skip if we have no recommendations for this trace
-        if trace_id not in recommendations:
-            print(f"No recommendations for trace {trace_id}")
-            continue
-        print(f"Evaluating trace {trace_id} with ground truth {ground_truth}")
-        recommended_conditions = recommendations[trace_id]
-
-        # Convert (activity, boolean) into just activity names
-        recommended_dict = dict(recommended_conditions)  # feature -> boolean
-        recommendation_followed = all(
-            row.get(feat, False) == val for feat, val in recommended_dict.items()
-        )
-        print(f"Done conditions:{row.to_dict()}")
-        print(f"Recommended conditions: {recommended_conditions}, Followed: {recommendation_followed}")
-        # All activities that actually happened in the trace
-        trace_activities = {
-            col
-            for col, value in row.items()
-            if col not in ["trace_id", "label", "predicted_label"]
-            and isinstance(value, (bool, int, float))
-            and value is True
+    
+    # Initialize counters
+    true_positives = 0
+    true_negatives = 0
+    false_positives = 0
+    false_negatives = 0
+    
+    # For evaluation, we need to track which traces we actually made recommendations for
+    evaluated_traces = 0
+    
+    # Process each trace in the test set
+    for idx, row in test_set.iterrows():
+        trace_data = row.to_dict()
+        trace_id = trace_data['trace_id']
+        ground_truth = trace_data['label']
+        
+        # Extract the features of the full trace (excluding metadata)
+        full_trace_features = {
+            k: v for k, v in trace_data.items() 
+            if k not in ['trace_id', 'label'] and v == True
         }
+        
+        # Find if we have a recommendation for this trace (by matching prefix features)
+        recommendation_found = False
+        recommendation_set = None
+        
+        for prefix_features, rec_activities in recommendations.items():
+            # Check if this prefix is a subset of the full trace features
+            if set(prefix_features).issubset(set(full_trace_features.keys())):
+                recommendation_found = True
+                recommendation_set = rec_activities
+                break
+        
+        if not recommendation_found:
+            # If no recommendation was made for this trace, skip it in evaluation
+            logging.debug(f"Trace ID: {trace_id} has no recommendation. Skipping.")
+            continue
+        
+        evaluated_traces += 1
+        
+        # Check if the recommendation was followed
+        # A recommendation is followed if ALL recommended activities are present in the full trace
+        recommendation_followed = True
+        
+        # Evaluate each recommended activity
+        for activity, should_be_present in recommendation_set:
+            if should_be_present:
+                # If the activity should be present, check if it's in the full trace
+                if activity not in full_trace_features:
+                    recommendation_followed = False
+                    break
+            else:
+                # If the activity should NOT be present, check if it's NOT in the full trace
+                if activity in full_trace_features:
+                    recommendation_followed = False
+                    break
 
-        recommended_activities = {feat for feat, val in recommended_conditions if val is True}
+        logging.debug(f"Trace ID: {trace_id}, Ground Truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
 
-        # Check whether all recommended activities appeared in the trace
-        recommendation_followed = all(a in trace_activities for a in recommended_activities)
-
-        # Update confusion matrix
-        if recommendation_followed and ground_truth == 'positive':
-            true_positive += 1
-        elif recommendation_followed and ground_truth == 'negative':
-            false_positive += 1
-        elif not recommendation_followed and ground_truth == 'negative':
-            true_negative += 1
-        elif not recommendation_followed and ground_truth == 'positive':
-            false_negative += 1
-
-    # Compute evaluation metrics
-    total = true_positive + true_negative + false_positive + false_negative
-
-    precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) > 0 else 0
-    recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) > 0 else 0
-    accuracy = (true_positive + true_negative) / total if total > 0 else 0
-    f1 = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-
+        # Classify based on the criteria
+        if recommendation_followed and ground_truth == 'true':
+            true_positives += 1
+        elif not recommendation_followed and ground_truth == 'false':
+            true_negatives += 1
+        elif recommendation_followed and ground_truth == 'false':
+            false_positives += 1
+        elif not recommendation_followed and ground_truth == 'true':
+            false_negatives += 1
+    
+    # Calculate metrics
+    total_predictions = true_positives + true_negatives + false_positives + false_negatives
+    logging.debug(f"Total predictions: {total_predictions}")
+    # Calculate metrics
+    precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
+    recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
+    f1_score_value = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    accuracy = (true_positives + true_negatives) / total_predictions if total_predictions > 0 else 0
+    
+    # Return comprehensive results
     return {
-        'precision': precision,
-        'recall': recall,
-        'accuracy': accuracy,
-        'f1_score': f1
+        'precision': round(precision, 4),
+        'recall': round(recall, 4),
+        'f1_score': round(f1_score_value, 4),
+        'accuracy': round(accuracy, 4),
     }
