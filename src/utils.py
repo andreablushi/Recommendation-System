@@ -169,7 +169,7 @@ def hyperparameter_optimization(encoded_data:pd.DataFrame, max_evals:int=100) ->
     print("Criterion:", best_params['criterion'])
     return best_params
 
-def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list, positive_class_value: str, class_values: list) -> list:
+def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> list:
     '''
         Extract all paths from root to leaves that predict the positive_class.
         To do this, simply traverse the trained decision tree using Depth-First Search (DFS).
@@ -180,7 +180,7 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list, positi
                 positive_class_value: The class value considered as positive (true).
             Returns:
                 list: A list of positive paths, where each path is represented as a list
-                of tuples (feature_name, 'true'/'false'). 
+                of tuples (feature_name, condition). 
     '''
     tree_ = tree.tree_
     paths = []
@@ -197,16 +197,15 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list, positi
         if tree_.feature[node] != _tree.TREE_UNDEFINED:
             # Get the feature name for the current node
             feature_name = feature_names[tree_.feature[node]]
-            # Get the threshold for the current node
-            threshold = tree_.threshold[node]
+
             # Recursively traverse both the left and right child nodes
-            DFS_traverse_tree(tree_.children_left[node], current_path + [(feature_name, class_values[0])])
-            DFS_traverse_tree(tree_.children_right[node], current_path + [(feature_name, class_values[1])])
+            DFS_traverse_tree(tree_.children_left[node], current_path + [(feature_name, False)])
+            DFS_traverse_tree(tree_.children_right[node], current_path + [(feature_name, True)])
         else:
             # We are in a leaf node, check the predicted class
-            predicted_class= class_values[np.argmax(tree_.value[node][0])]
+            predicted_class = bool(np.argmax(tree_.value[node][0]))
             # If the prediction is positive, store the path
-            if predicted_class == positive_class_value:
+            if predicted_class:
                 paths.append(current_path)
             return
     # Start the recursive DFS traversal, with an empty path
@@ -231,6 +230,7 @@ def get_compliant_paths(paths: list, prefix_trace: dict) -> list:
         for feature_name, boolean_value in path:
             # Check if the feature exists in the prefix_trace
             if feature_name not in prefix_trace:
+                print(f"{feature_name} not in {prefix_trace}")
                 match = False
                 break
 
@@ -238,10 +238,13 @@ def get_compliant_paths(paths: list, prefix_trace: dict) -> list:
             prefix_value = prefix_trace[feature_name]
             # If the condition is not satisfied, mark the path as non-compliant and break
             if boolean_value != prefix_value:
+                print(f"{feature_name}: {boolean_value} != {prefix_value} -> Discarded trace")
                 match = False
                 break
+        
         # If the path is compliant, add it to the list
         if match:
+            print("Match found!")
             compliant_paths.append(path)
     return compliant_paths
 
@@ -256,6 +259,7 @@ def get_best_compliant_path(compliant_paths: list, tree: DecisionTreeClassifier,
             Returns:
                 tuple: (best_path, confidence) - The compliant path with the highest confidence and its confidence score.
     '''
+    print("Best_compliant_path")
     if not compliant_paths:
         return None, 0.0
     
@@ -270,6 +274,7 @@ def get_best_compliant_path(compliant_paths: list, tree: DecisionTreeClassifier,
         for feature_name, boolean_value in path:
             # Check if we've reached a leaf node prematurely
             if tree.tree_.feature[node] == _tree.TREE_UNDEFINED:
+                print("Error in the path!")
                 valid_traversal = False
                 break
             
@@ -284,22 +289,25 @@ def get_best_compliant_path(compliant_paths: list, tree: DecisionTreeClassifier,
                 elif boolean_value == class_values[1]:  # Right child (e.g., 'true')
                     node = tree.tree_.children_right[node]
                 else:
+                    print("Ivalid Path")
                     # Invalid boolean value
                     valid_traversal = False
                     break
             else:
+                print("Invalid Path:")
                 # Feature mismatch - this shouldn't happen for valid paths
                 valid_traversal = False
                 break
         
         if not valid_traversal:
             continue
-        
-        # Get the confidence of the prediction at the leaf node
+
+        # Get the confidence of the prediction at the leaf node. It is defined as TRUE / #ELEMENTS
         value = tree.tree_.value[node]
         total_samples = sum(value[0])
-        positive_samples = value[0][1]  # Assuming positive class is indexed at 1
-        confidence = positive_samples / total_samples if total_samples > 0 else 0
+        # The positive samples are index 1
+        positive_samples = value[0][1]  
+        confidence = positive_samples / total_samples
 
         # Update the best path if this one has higher confidence
         if confidence > highest_confidence:
@@ -322,7 +330,7 @@ def path_to_rule(path):
         rule.append(f"{feature_name} == {boolean_value}")
     return " AND ".join(rule)
 
-def extract_recommendations(tree, feature_names, class_values:list, prefix_set: pd.DataFrame) -> dict:
+def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> dict:
     '''
         Extract recommendations from a decision tree for given prefixes.
             Parameters:
@@ -333,31 +341,31 @@ def extract_recommendations(tree, feature_names, class_values:list, prefix_set: 
             Returns:
                 dict: A dictionary mapping prefixes to their recommendations.
     '''
-    POSITIVE_CLASS_VALUE = class_values[1] 
     recommendation = {}
-
     # Extract the positive paths from the decision tree
-    paths = get_positive_paths(tree, feature_names, positive_class_value=POSITIVE_CLASS_VALUE, class_values=class_values)
+    paths = get_positive_paths(tree, feature_names)
+    print("Paths:")
+    for p in paths:
+        path_to_rule(p)
 
     # For every prefix_trace with False label
     for idx, row in prefix_set.iterrows():
         prefix_trace = row.to_dict()
         # Only process negative cases
-        if prefix_trace.get('label') == POSITIVE_CLASS_VALUE:
+        if prefix_trace.get('predicted_label') == 'true':
             continue
         
         # Filter only the actual activities done in the trace
-        prefix_trace_features = {k: v for k, v in prefix_trace.items() if k != 'label' and k != 'trace_id'}
-        print(prefix_trace_features)
-
+        prefix_trace_features = {k: v for k, v in prefix_trace.items() if k != 'predicted_label' and k != 'trace_id' and v != False}
         # Get the compliant paths for the current prefix_trace
         compliant_paths = get_compliant_paths(paths, prefix_trace_features)
 
         # If there is at least one compliant path
         if compliant_paths:
+            print("AAAAAAAAAAA")
+            # Find the path with the highest confidence
             best_path, _ = get_best_compliant_path(compliant_paths, tree, feature_names, class_values)
-        
-        # Find the path with the highest confidence
+            
     return 0
         
 def evaluate_recommendations(test_set: EventLog, recommendations:list) -> dict:
