@@ -1,0 +1,37 @@
+\section{Implementation}
+
+We implemented a recommendation system using a decision tree classifier to analyze production event logs.
+The implementation was achieved using Python, leveraging libraries such as \text{PM4Py} for process mining tasks and \text{scikit-learn} for machine learning functionalities.
+The execution flow of our implementation resides within the \textit{notebook.ipynb} file, which calls all the designed functions in \textit{utils.py}.
+
+\subsection{Encoding the Event Log}
+
+We began by importing the event log file, which is in \text{XES} format, using the PM4Py library. 
+We then converted this file into a PM4Py event log object suitable for subsequent process mining tasks.
+
+Then, we created a copy of the event log, in order to cut to the first \textit{prefix\_length} events of each trace.
+This is done to increase the efficiency of the model. %#TODO: CHECK THIS
+
+Next, we extracted the unique activity names from the log to serve as columns (features) for the encoding step. 
+To these columns, we also appended the trace ID and the ground truth label.
+
+We then applied the \textit{Boolean Encoding} technique. 
+This encoding involved creating binary features for each unique activity name. 
+If an activity was present within a specific trace, the corresponding feature in that row was set to true (1); otherwise, it was set to false (0).
+We implemented the padding of traces, in case of traces shorter than the specified prefix length, in an implicit way: if an activity was not present in the trace, its corresponding feature would naturally be set to false (0). %#TODO: CHECK THIS
+Upon completion, we obtained a DataFrame where each row represented a trace and the feature columns indicated the presence or absence of specific activities within that trace.
+
+\subsection{Training the Decision Tree Classifier}
+After encoding the event log, we trained a decision tree classifier using the \textsc{scikit-learn} library.  
+We split the encoded log into features (by removing the trace identifier and label columns) and labels, which were the ground truth extracted directly from the log.  
+The \text{XES} file was already partitioned into separate training and testing sets; we used these to train and evaluate the classifier, respectively.
+
+The testing set was encoded with the same Boolean encoding described earlier.  
+After evaluating the classifier on the test set, we visualized the learned decision rules by plotting the decision tree using built-in \textsc{scikit-learn} functionality.  
+We further assessed performance by generating the confusion matrix (also provided by \textsc{scikit-learn}) and computing accuracy, precision, recall, and F1-score.
+
+\subsection{Optimizing the Classifier Parameters}
+
+\subsection{Extracting Recommendations}
+
+\subsection{Evaluation of Recommendations}
