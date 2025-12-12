@@ -4,8 +4,8 @@ The implementation was achieved using Python, leveraging libraries such as \text
 The execution flow of our implementation resides within the \textit{notebook.ipynb} file, which calls all the designed utility functions.
 
 \subsection{Encoding the Event Log}
-We began by importing the event log file, which is in \textit{XES} format, using the PM4Py library. 
-We then converted this file into a PM4Py event log object suitable for subsequent process mining tasks.
+We began by importing the event log file, which is in \textit{XES} format, using the \textit{PM4Py} library. 
+We then converted this file into a \textit{PM4Py} event log object suitable for subsequent process mining tasks.
 \\\\
 A pruned copy of the event log was created in order to take into consideration only the prefixes of each trace.
 To do this, each trace in the log was truncated to \textit{prefix\_length} events.
@@ -13,27 +13,27 @@ Since in a real-world scenario the partial ongoing trace is incomplete, we need 
 only on the prefixes of the traces.
 \\\\
 Next, from the complete event log, we extracted the unique activity names to serve as columns (features) for the encoding step.
-To these columns, we also added the trace ID and the ground truth label.
+To these columns, we also added the trace identifier and the ground truth label that indicates whether the trace outcome was positive or negative.
 \\\\
 To use this data for training a decision tree classifier, we encoded the pruned event using a \textit{Boolean encoding} scheme.
 This encoding involved creating binary features for each unique activity name. 
 For each trace in the event log, if an activity was present within the trace, the corresponding feature in that row was set to true (1); otherwise, it was set to false (0).
 This approach allows to build a feature set with a fixed number of columns, regardless of the varying lengths of the traces. This implies that we don't need to worry about padding the traces to a uniform length.
-Upon completion, we obtained a DataFrame where each row represented a trace and the feature columns indicated the presence or absence of specific activities within that trace.
+Upon completion, we obtained a \textit{DataFrame} in which each row represented a trace, while the feature columns indicated the presence or absence of specific activities within that trace.
 
 \subsection{Training the Decision Tree Classifier}
 After encoding the pruned event log, a decision tree classifier was trained using the \textit{scikit-learn} library.  
 We split the encoded log into features (by removing the trace identifier and label columns from the original encoding) and labels, which were the ground truth extracted directly from the log.  
 The \textit{XES} file was already partitioned into separate training and testing sets; we used these to train and evaluate the classifier, respectively.
+\\\\
+After training the classifier, it was possible to visualize the learned decision rules by plotting the decision tree using built-in \textit{scikit-learn} functionality.  
 
-After training the classifier, it's possible to visualize the learned decision rules by plotting the decision tree using built-in \textit{scikit-learn} functionality.  
-
-\subsection{Optimizing the Classifier hyperparameters}
+\subsection{Optimizing the Classifier Hyperparameters}
 To enhance the performance of our decision tree classifier, we employed the \textit{Hyperopt} library to perform hyperparameter optimization.
 This tool systematically iterates through various combinations of hyperparameters, such as maximum tree depth, maximum features, and criterion (e.g., Gini or entropy), to identify the configuration that yields the optimal performance.
 At every iteration, the model was trained and evaluated using the $F_1$-score as the primary performance metric. 
 Only the configuration that resulted in the highest $F_1$-score was retained for the final model.
-The Hyperopt library also allows us to define a search space and to specify the maximum number of iterations to perform.
+The \textit{Hyperopt} library also allowed us to define a search space and to specify the maximum number of iterations to perform.
 
 \subsection{Generating Predictions}
 After training the classifier, we used it to generate predictions on the test set. 
@@ -44,12 +44,12 @@ Then we evaluated the classifier's performance using standard metrics such as ac
 \subsection{Extracting Recommendations}
 Given the predictions obtained from the decision tree classifier, using the transparent structure of the tree, 
 we can provide recommendations for traces predicted to have a negative outcome.
-To do this, we need to:
+To achieve this, we needed to:
 \begin{enumerate}
     \item Extract the positive paths from the decision tree, which are the paths leading to leaf nodes with a positive outcome.
     \item For each prefix trace predicted as negative:
     \begin{itemize}
-        \item Filter the positive paths to find the ones that are compliant with the current trace (no condition along the path is violated by the current trace);
+        \item Filter the positive paths to find the ones that are compliant with the current trace;
         \item From the compliant paths, take the one with the highest confidence score;
         \item The recommended activities are the ones that need to be added to the current trace to follow the selected positive path.
     \end{itemize}
@@ -57,24 +57,24 @@ To do this, we need to:
 
 \paragraph{Extracting Positive Paths from the Decision Tree:}
 To extract the positive paths from the decision tree, we traversed the tree structure starting from the root node in a \textit{depth-first} manner.
-At each node in the path, we record the feature and the boolean condition (true or false) that leads to the next node.
-When we reach a leaf node, we check if it corresponds to a positive outcome. If it does, we store the entire path taken to reach that leaf, with the associated confidence score, as a positive path.
+At each node in the path, we recorded the feature and the boolean condition (true or false) that leads to the next node.
+When we reached a leaf node, we checked if it corresponded to a positive outcome. If it did, we stored the entire path taken to reach that leaf, with the associated confidence score, as a positive path.
 \begin{algorithm}[H]
     \label{alg:get_positive_paths}
     \caption{Get Positive Paths}
     \begin{algorithmic}[1]
     \Function{GetPositivePaths}{node, current\_path, positive\_paths}
-        \If{node is leaf}
+        \If{node \textbf{is} leaf}
             \If{node.label == positive}
                 \State Add (current\_path, node.confidence) to positive\_paths
             \EndIf
         \Else
             \State Append (node.feature, False) to current\_path
-            \State Call GetPositivePaths(node.left, current\_path, positive\_paths)
+            \State Call \textbf{GetPositivePaths}(node.left, current\_path, positive\_paths)
             
             \State Remove last element from current\_path
             \State Append (node.feature, True) to current\_path
-            \State Call GetPositivePaths(node.right, current\_path, positive\_paths)
+            \State Call \textbf{GetPositivePaths}(node.right, current\_path, positive\_paths)
             
             \State Remove last element from current\_path
         \EndIf
@@ -91,14 +91,14 @@ Among all the compliant paths, we selected the one with the highest confidence s
 Once we identified the most suitable positive compliant path, we generated recommendations by determining the activities that needed to be added to the current trace to follow the selected path.
 For each prefix seen in the test set, its recommendation is defined as follows:
 \begin{itemize}
-    \item $\emptyset$ if the prefix was predicted as positive or if no compliant positive path was found;
+    \item The empty set if the prefix was predicted as positive or if no compliant positive path was found;
     \item The set of activities corresponding to the conditions in the selected positive path that were not satisfied by the current prefix trace otherwise.
 \end{itemize}
 
 \subsection{Evaluation of Recommendations}
 To evaluate the quality of the recommendations generated, we compared them against the actual traces in the test set, where the encoded test set served as the ground truth for comparison.
 
-For each complete trace in the test set, we first checked if the trace's prefix matched the specific conditions (the features present) leading to a particular recommendation as defined by the decision tree classifier.
+For each complete trace in the test set, we first checked if the trace's prefix matched the specific conditions leading to a particular recommendation, as defined by the decision tree classifier.
 Only if a prefix match occurred, we then proceeded to check if the recommended activity was actually performed in the subsequent step of the actual trace following that prefix.
 This recommendation outcome was then compared with the ground truth outcome of the trace to determine the predictive accuracy of the recommendation.
 
