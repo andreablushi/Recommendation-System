@@ -1,3 +1,4 @@
+import os
 import pm4py
 import logging
 from pm4py.objects.log.obj import EventLog, Trace
@@ -18,7 +19,7 @@ logging.basicConfig(
 )
 # Create and configure your application's logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.DEBUG)  # Set your module's logger to INFO
 
 def import_log(file_path: str) -> EventLog:
     """
@@ -28,6 +29,11 @@ def import_log(file_path: str) -> EventLog:
         Returns:
             elem.EventLog: The imported event log object.
     """
+    # Check that the file path is valid
+    if not os.path.isfile(file_path):
+        logger.error(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}. Have you extracted the dataset?")
+    
     logger.info(f"Importing log from file: {file_path}")
     log = pm4py.read_xes(file_path)
     log = log_converter.apply(log, variant=log_converter.Variants.TO_EVENT_LOG, parameters={})
@@ -53,7 +59,7 @@ def create_prefixes_log(log: EventLog, prefix_length: int) -> EventLog:
         # Set the attributes of the prefix trace to match the original trace
         prefix_trace.attributes.update(trace.attributes)
 
-        # For each of the first 'prefix_length' events in the trace
+        # Keep only the first 'prefix_length' events
         for event in trace[:prefix_length]:
             prefix_trace.append(event)
         # Add the trace to the new log
@@ -80,9 +86,12 @@ def get_activity_names(log: EventLog) -> list[str]:
 
 def compute_columns(activity_names:list) -> list[str]:
     '''
-        Compute the column names for the dataset based on activity names.
+        Returns a list of column names for boolean encoding. The columns include:
+            - 'trace_id' for trace identification;
+            - One column for each activity name;
+            - 'label' for the ground truth label.
         Parameters:
-            activity_names (list): List of activity names.
+            activity_names (list): List of unique activity names.
         Returns:
             list: List of column names including 'trace_id', activity names, and 'label'.
     '''
@@ -96,7 +105,10 @@ def compute_columns(activity_names:list) -> list[str]:
 
 def boolean_encode(log: EventLog, activity_names:list):
     '''
-        Boolean encode the event log into a DataFrame.
+        Boolean encode the event log into a DataFrame. For each trace, create a row with:
+            - 'trace_id' for trace identification;
+            - One boolean column for each activity name indicating presence (True) or absence (False);
+            - 'label' for the ground truth label.
         Parameters:
             log (EventLog): The event log object.
             activity_names (list): List of activity names.
@@ -107,23 +119,32 @@ def boolean_encode(log: EventLog, activity_names:list):
     encoded_log = []
     # Build column names
     columns = compute_columns(activity_names)
+    
+    # For each trace in the log
     for trace in log:
         # Initialize the encoded row with trace_id
         encoded_row = [trace.attributes["concept:name"]]
-        # Initialize boolean indicators for each activity
+        # Initialize boolean indicators for each activity as False
         bool_events = [False]*len(activity_names)   
+
         for event in trace:
+            # Get the activity name of the event
             event_name = event["concept:name"]
-            # If the event name is present in activity names, that means this activity occurred in the trace
             if event_name in activity_names:
-                # Get the index of the activity name in order to update the corresponding boolean indicator
+                # Get the index of the activity name
                 activity_name_index = activity_names.index(event["concept:name"])
-            bool_events[activity_name_index]=True
+                # Mark the activity as present (True)
+                bool_events[activity_name_index]=True
         # Append boolean indicators and label to the encoded row
         encoded_row += bool_events
+        
+        # Append the ground truth label to the row
         encoded_row.append(trace.attributes["label"])
-        # Append the encoded row to the encoded log
+        
+        # Add the encoded row to the log
         encoded_log.append(encoded_row)
+    
+    logger.info("Boolean encoding created successfully.")
     return pd.DataFrame(columns=columns, data=encoded_log)
 
 def hyperparameter_optimization(encoded_data:pd.DataFrame, max_evals:int=100, space:dict=None) -> dict:
@@ -194,15 +215,16 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
     '''
         Extract all paths from root to leaves that predict the positive_class.
         To do this, simply traverse the trained decision tree using Depth-First Search (DFS).
-
+        Once a positive leaf is reached, compute the confidence of that path and store the path.
             Parameters:
                 tree: The decision tree model.
                 feature_names: List of feature names used in the model.
                 positive_class_value: The class value considered as positive (true).
             Returns:
                 list of tuples: [(path_conditions, confidence), ...]
-                where path_conditions is a list of (feature_name, boolean_value)
+                where path_conditions is a list of tuples (feature_name, boolean_value)
     '''
+    logger.info("Extracting positive paths from the decision tree.")
     tree_ = tree.tree_
     paths = []
 
@@ -212,18 +234,12 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
             Parameters:
                 node: The current node in the decision tree.
                 current_path: The path taken to reach the current node.
-        If we reach a positive leaf, we store the current path in the paths list.
+        If we reach a positive leaf, we store the current path in the paths list, with its confidence   .
     '''
     def DFS_traverse_tree(node, current_path):
-        if tree_.feature[node] != _tree.TREE_UNDEFINED:
-            # Get the feature name for the current node
-            feature_name = feature_names[tree_.feature[node]]
-
-            # Recursively traverse both the left and right child nodes
-            DFS_traverse_tree(tree_.children_left[node], current_path + [(feature_name, False)])
-            DFS_traverse_tree(tree_.children_right[node], current_path + [(feature_name, True)])
-        else:
-            # Leaf node: check the predicted class
+        if tree_.feature[node] == _tree.TREE_UNDEFINED:
+            # Base case: leaf node
+            # Check the predicted class
             predicted_class = bool(np.argmax(tree_.value[node][0]))
             
             # If the prediction is positive, compute confidence and store the path
@@ -231,39 +247,58 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
                 values = tree_.value[node][0]
                 total_samples = sum(values)
                 positive_samples = values[1]  # assuming positive class is index 1
-                confidence = positive_samples / total_samples if total_samples > 0 else 0.0
+                confidence = positive_samples / total_samples if total_samples > 0 else 0.0 
+                # Store the path and its confidence
                 paths.append((current_path, confidence))
+                logger.debug(f"Found positive path: {path_to_rule(current_path)} with confidence {confidence}")
             return
+        else:
+            # Recursive case: internal node
+            # Get the feature name for the current node
+            feature_name = feature_names[tree_.feature[node]]
+
+            # Recursively traverse both the left and right child nodes
+            DFS_traverse_tree(tree_.children_left[node], current_path + [(feature_name, False)]) # Taking the left path: the feature is not present
+            DFS_traverse_tree(tree_.children_right[node], current_path + [(feature_name, True)]) # Taking the right path: the feature is present
+            
     # Start the recursive DFS traversal, with an empty path
     DFS_traverse_tree(0, [])
+    logger.info(f"Extracted {len(paths)} positive paths from the decision tree.")
     return paths
 
 def get_compliant_paths(paths: list, prefix_trace: dict) -> list:
     '''
-        Extract the paths that are compliant with the given prefix_trace.
+        Extract the paths that are compliant with the given prefix_trace. A path is compliant
+        if no condition in the path contradicts the prefix_trace (no True features in the prefix that are False in the path).
             Parameters:
                 paths: A list of paths to filter.
-                prefix_trace: A dictionary representing the prefix trace.
+                prefix_trace: A dictionary representing only the activity done in the prefix trace.
             Returns:
-                list: A list of compliant paths.
+                list: filter list of paths, containing only the compliant ones.
     '''
+    logger.info("Extracting compliant paths for the given prefix trace.")
     compliant_paths = []
+    
     # For each positive path
     for path in paths:
         match = True
         
         # For each condition in the path
         for feature_name, boolean_value in path[0]:
+            # If that feature was done in the prefix trace
             if feature_name in prefix_trace:
                 # If the condition is not satisfied, mark the path as non-compliant and break
                 if prefix_trace[feature_name] != boolean_value:
-                    #print(f"{feature_name}: {boolean_value} != {prefix_value} -> Discarded trace")
+                    logger.debug(f"{feature_name}: {boolean_value} != {prefix_trace[feature_name]} (prefix) -> Discarded trace")
                     match = False
                     break
 
         # If the path is compliant, add it to the list
         if match:
             compliant_paths.append(path)
+            logger.debug(f"Compliant path found: {path_to_rule(path[0])} with confidence {path[1]}")
+
+    logger.info(f"Found {len(compliant_paths)} compliant paths for the given prefix trace.")
     return compliant_paths
 
 def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> dict:
@@ -279,20 +314,17 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
                 if the prefix is already positive, the recommendation is an empty set.
                 Otherwise, where possible, it contains the missing activities to reach a positive outcome.
     '''
+    logger.info("Extracting recommendations for the given prefix set.")
     recommendation = {}
 
     # Extract the positive paths from the decision tree
-    logger.info("Extracting recommendations from the decision tree.")
     paths = get_positive_paths(tree, feature_names)
-    logger.info(f"Total positive paths extracted: {len(paths)}")
-    for p in paths:
-        logger.debug(f"Positive Path: {path_to_rule(p[0])} with confidence {p[1]}")
-    
+        
     # For every prefix_trace with False label
     for idx, row in prefix_set.iterrows():
         prefix_trace = row.to_dict()
 
-        # Skip all the positive traces
+        # If the prefix trace was predicted as positive, we can add an empty recommendation
         if prefix_trace.get('predicted_label') == 'true':
             true_prefix = frozenset({k: v for k, v in prefix_trace.items() if k != 'predicted_label' and k != 'trace_id' and v})
             recommendation[true_prefix] = set()
@@ -308,11 +340,8 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
         
         # Get the compliant paths for the current prefix_trace
         compliant_paths = get_compliant_paths(paths, prefix_trace_features)
-        logger.debug(f"Number of compliant paths found: {len(compliant_paths)}")
-        for cp in compliant_paths:
-            logger.debug(f"Compliant Path: {path_to_rule(cp[0])}, with confidence {cp[1]}")
 
-        # If no compliant path is found, we can continue
+        # If no compliant path is found, set empty recommendation
         if not compliant_paths:
             recommendation[prefix_trace.get('trace_id')] = set()
             continue
@@ -336,6 +365,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
     for k, v in recommendation.items():
         logger.debug(f"Prefix Trace: {set(k)} -> Recommended Activities: {v}")
     
+    logger.info("Recommendations extraction completed.")
     return recommendation
         
 def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> dict:
@@ -348,84 +378,68 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
             Returns:
                 dict: A dictionary containing evaluation metrics
     """
+    logger.info("Evaluating recommendations")
+    
     
     # Initialize counters
-    true_positives = 0
-    true_negatives = 0
-    false_positives = 0
-    false_negatives = 0
-    
-    # For evaluation, we need to track which traces we actually made recommendations for
-    evaluated_traces = 0
+    t_p = t__n = f_p = f_n = 0
     
     # Process each trace in the test set
-    for idx, row in test_set.iterrows():
-        trace_data = row.to_dict()
-        trace_id = trace_data['trace_id']
-        ground_truth = trace_data['label']
+    for _, row in test_set.iterrows():
+        trace_id = row['trace_id']
+        ground_truth = row['label']
         
-        # Extract the features of the full trace (excluding metadata)
+        # Extract the features of the full trace
         full_trace_features = {
-            k: v for k, v in trace_data.items() 
+            k: v for k, v in row.items() 
             if k not in ['trace_id', 'label'] and v == True
         }
         
-        # Find if we have a recommendation for this trace (by matching prefix features)
-        recommendation_found = False
-        recommendation_set = None
-        
-        for prefix_features, rec_activities in recommendations.items():
+        # Find matching recommendation for this prefix trace
+        recommendation = None
+
+        for prefix_features, rec in recommendations.items():
             # Check if this prefix is a subset of the full trace features
-            if set(prefix_features).issubset(set(full_trace_features.keys())):
-                recommendation_found = True
-                recommendation_set = rec_activities
+            if set(prefix_features).issubset(set(full_trace_features)):
+                recommendation = rec
                 break
         
-        if not recommendation_found:
+        if not recommendation:
             # If no recommendation was made for this trace, skip it in evaluation
             logger.debug(f"Trace ID: {trace_id} has no recommendation. Skipping.")
             continue
         
-        evaluated_traces += 1
-        
-        # Check if the recommendation was followed
-        # A recommendation is followed if ALL recommended activities are present in the full trace
+        # Check if the recommendation was followed. It is if all prefix and recommended activities match the full trace
         recommendation_followed = True
         
         # Evaluate each recommended activity
-        for activity, should_be_present in recommendation_set:
-            if should_be_present:
-                # If the activity should be present, check if it's in the full trace
-                if activity not in full_trace_features:
-                    recommendation_followed = False
-                    break
-            else:
-                # If the activity should NOT be present, check if it's NOT in the full trace
-                if activity in full_trace_features:
-                    recommendation_followed = False
-                    break
-
-        logger.debug(f"Trace ID: {trace_id}, Ground Truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
+        for activity, should_be_present in recommendation:
+            if should_be_present and activity not in full_trace_features:
+                recommendation_followed = False
+                break
+            if not should_be_present and activity in full_trace_features:
+                recommendation_followed = False
+                break
+        
+        logger.debug(f"Trace {trace_id}: truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
 
         # Classify based on the criteria
         if recommendation_followed and ground_truth == 'true':
-            true_positives += 1
+            t_p += 1
         elif not recommendation_followed and ground_truth == 'false':
-            true_negatives += 1
+            t_n += 1
         elif recommendation_followed and ground_truth == 'false':
-            false_positives += 1
+            f_p += 1
         elif not recommendation_followed and ground_truth == 'true':
-            false_negatives += 1
-    
+            f_n += 1
+
     # Calculate metrics
-    total_predictions = true_positives + true_negatives + false_positives + false_negatives
-    print(f"Total predictions: {total_predictions}")
-    # Calculate metrics
-    precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
-    recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
+    total_predictions = t_p + t_n + f_p + f_n
+    precision = t_p / (t_p + f_p) if (t_p + f_p) > 0 else 0
+    recall = t_p / (t_p + f_n) if (t_p + f_n) > 0 else 0
     f1_score_value = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-    accuracy = (true_positives + true_negatives) / total_predictions if total_predictions > 0 else 0
-    
+    accuracy = (t_p + t_n) / total_predictions if total_predictions > 0 else 0
+
     # Return comprehensive results
     return {
         'precision': round(precision, 4),
