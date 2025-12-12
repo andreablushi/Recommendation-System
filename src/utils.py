@@ -382,7 +382,7 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
     
     
     # Initialize counters
-    t_p = t__n = f_p = f_n = 0
+    t_p = t_n = f_p = f_n = 0
     
     # Process each trace in the test set
     for _, row in test_set.iterrows():
