@@ -97,6 +97,8 @@ def compute_columns(activity_names:list) -> list[str]:
     '''
     # Start with 'trace_id' column
     columns = ['trace_id']
+    # Add a column representing the length of the prefix
+    columns += ['prefix_length']
     # Add the found activity names as columns
     columns += activity_names
     # Add 'label' column for ground truth
@@ -124,9 +126,11 @@ def boolean_encode(log: EventLog, activity_names:list):
     for trace in log:
         # Initialize the encoded row with trace_id
         encoded_row = [trace.attributes["concept:name"]]
+        # Append the prefix length
+        encoded_row.append(len(trace))
+        logger.debug(f"Encoding trace ID: {trace.attributes['concept:name']} with prefix length: {len(trace)}")
         # Initialize boolean indicators for each activity as False
         bool_events = [False]*len(activity_names)   
-
         for event in trace:
             # Get the activity name of the event
             event_name = event["concept:name"]
@@ -223,6 +227,9 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
             Returns:
                 list of tuples: [(path_conditions, confidence), ...]
                 where path_conditions is a list of tuples (feature_name, boolean_value)
+        
+        TODO: refactor this, adding the support for prefix_length conditions in the path. We should restore the old
+        path definition (feature, operator, value)
     '''
     logger.info("Extracting positive paths from the decision tree.")
     tree_ = tree.tree_
@@ -265,7 +272,7 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
     DFS_traverse_tree(0, [])
     logger.info(f"Extracted {len(paths)} positive paths from the decision tree.")
     return paths
-
+    
 def get_compliant_paths(paths: list, prefix_trace: dict) -> list:
     '''
         Extract the paths that are compliant with the given prefix_trace. A path is compliant
@@ -274,7 +281,8 @@ def get_compliant_paths(paths: list, prefix_trace: dict) -> list:
                 paths: A list of paths to filter.
                 prefix_trace: A dictionary representing only the activity done in the prefix trace.
             Returns:
-                list: filter list of paths, containing only the compliant ones.
+                list: filter list of paths, containing only the compliant ones.    
+        TODO: add another condition: if the path contains a condition on prefix_length, check that the length of the prefix_trace is smaller
     '''
     logger.info("Extracting compliant paths for the given prefix trace.")
     compliant_paths = []
@@ -392,7 +400,7 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
         # Extract the features of the full trace
         full_trace_features = {
             k: v for k, v in row.items() 
-            if k not in ['trace_id', 'label'] and v == True
+            if k not in ['trace_id', 'label', 'prefix_length'] and v == True
         }
         
         # Find matching recommendation for this prefix trace
@@ -400,16 +408,21 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
 
         for prefix_features, rec in recommendations.items():
             # Check if this prefix is a subset of the full trace features
+            # A prefix 'P' matches if all activities in 'P' are also in the 'full_trace_features'.
             if set(prefix_features).issubset(set(full_trace_features)):
                 recommendation = rec
                 break
         
-        if not recommendation:
+        if recommendation is None:
             # If no recommendation was made for this trace, skip it in evaluation
             logger.debug(f"Trace ID: {trace_id} has no recommendation. Skipping.")
             continue
         
-        # Check if the recommendation was followed. It is if all prefix and recommended activities match the full trace
+        """
+        Check if the recommendation was followed. 
+         - A recommendation is followed if all recommended activities are present (True)
+         - and all recommended activities that should be absent (False) are indeed absent in the full trace.
+        """
         recommendation_followed = True
         
         # Evaluate each recommended activity
@@ -423,22 +436,32 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
         
         logger.debug(f"Trace {trace_id}: truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
 
-        # Classify based on the criteria
+        # Classify based on the report's criteria (Section 2.6)
         if recommendation_followed and ground_truth == 'true':
+            # True Positives: The recommended activity was followed in the actual trace, and the ground truth outcome is positive. 
             t_p += 1
         elif not recommendation_followed and ground_truth == 'false':
+            # True Negatives: The recommended activity was not followed in the actual trace, and the ground truth outcome is negative. 
             t_n += 1
-        elif recommendation_followed and ground_truth == 'false':
-            f_p += 1
         elif not recommendation_followed and ground_truth == 'true':
+            # False Positives: The recommended activity was not followed in the actual trace, but the ground truth outcome is positive. 
+            f_p += 1
+        elif recommendation_followed and ground_truth == 'false':
+            # False Negatives: The recommended activity was followed in the actual trace, but the ground truth outcome is negative. 
             f_n += 1
 
     # Calculate metrics
     total_predictions = t_p + t_n + f_p + f_n
+    
+    if total_predictions == 0:
+         return {
+            'precision': 0.0, 'recall': 0.0, 'f1_score': 0.0, 'accuracy': 0.0,
+        }
+
     precision = t_p / (t_p + f_p) if (t_p + f_p) > 0 else 0
     recall = t_p / (t_p + f_n) if (t_p + f_n) > 0 else 0
     f1_score_value = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-    accuracy = (t_p + t_n) / total_predictions if total_predictions > 0 else 0
+    accuracy = (t_p + t_n) / total_predictions
 
     # Return comprehensive results
     return {
