@@ -437,7 +437,6 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
     """
     logger.info("Evaluating recommendations")
     
-    
     # Initialize counters
     t_p = t_n = f_p = f_n = 0
     
@@ -445,20 +444,19 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
     for _, row in test_set.iterrows():
         trace_id = row['trace_id']
         ground_truth = row['label']
-        
-        # Extract the features of the full trace
+
+        # Extract the features of the full trace (activities that occurred (True))
         full_trace_features = {
-            k: v for k, v in row.items() 
+            k for k, v in row.items() 
             if k not in ['trace_id', 'label', 'prefix_length'] and v == True
         }
         
         # Find matching recommendation for this prefix trace
         recommendation = None
-
         for prefix_features, rec in recommendations.items():
             # Check if this prefix is a subset of the full trace features
             # A prefix 'P' matches if all activities in 'P' are also in the 'full_trace_features'.
-            if set(prefix_features).issubset(set(full_trace_features)):
+            if set(prefix_features).issubset(full_trace_features):
                 recommendation = rec
                 break
         
@@ -474,14 +472,22 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
         """
         recommendation_followed = True
         
-        # Evaluate each recommended activity
-        for activity, should_be_present in recommendation:
-            if should_be_present and activity not in full_trace_features:
-                recommendation_followed = False
-                break
-            if not should_be_present and activity in full_trace_features:
-                recommendation_followed = False
-                break
+        if len(recommendation) == 0:
+            # Empty recommendation means that no changes are needed
+            recommendation_followed = True
+        else:
+            # Check each recommended activity
+            for boolean_condition in recommendation:
+                activity = boolean_condition.feature
+                should_be_present = boolean_condition.value
+                # Check if the activity is present in the full trace
+                is_present = activity in full_trace_features
+                if should_be_present and not is_present:
+                    recommendation_followed = False
+                    break
+                if not should_be_present and is_present:
+                    recommendation_followed = False
+                    break
         
         logger.debug(f"Trace {trace_id}: truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
 

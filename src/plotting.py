@@ -185,3 +185,38 @@ def path_to_rule(path: Path):
         else:
             rule_parts.append(f"({condition.feature} {condition.op} {condition.threshold})")
     return " AND ".join(rule_parts)
+
+def print_recommendations(recommendations: dict, max_display: int = 5):
+    '''
+        Print the recommendations in a human-readable format.
+        Parameters:
+            recommendations: A dictionary where keys are prefix features (tuples) and values are sets of recommended conditions.
+            max_display: Maximum number of recommendations to display.
+    '''
+    print(f"Displaying up to {max_display} recommendations:")
+    for i, (prefix, recommendation) in enumerate(list(recommendations.items())[:max_display]):
+        if len(recommendation):
+            rec_str = [f"{c.feature} == {c.value}" for c in recommendation]
+            print(f"Prefix Trace {i+1}: {set(prefix)} -> Recommended Activities: {rec_str}")
+        else: 
+            print(f"Prefix Trace {i+1}: {set(prefix)} -> No changes recommended.")
+
+def get_recommendation_from_id(recommendations: dict, trace_index: int):
+    """
+    Extract a specific recommendation by index and format it for plotting.
+        Parameters:
+            recommendations: Dictionary of recommendations from extract_recommendations
+            trace_index: Index of the trace to extract (1-based)   
+        Returns:
+            tuple: (prefix_trace_features, recommended_conditions)
+                - prefix_trace_features: set of activity names in the prefix
+                - recommended_conditions: set of (activity_name, value) tuples
+    """
+    # Extract prefix features and recommendation
+    prefix_features, recommendation = list(recommendations.items())[trace_index]
+    # Convert prefix frozenset to regular set of activity names
+    prefix_trace_features = set(prefix_features)
+    # Convert BooleanConditions to (activity_name, value) tuples
+    recommended_conditions = {(cond.feature, cond.value) for cond in recommendation}
+    return prefix_trace_features, recommended_conditions
+        
