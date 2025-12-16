@@ -204,7 +204,7 @@ def hyperparameter_optimization(encoded_data:pd.DataFrame, max_evals:int=100, sp
     # Run hyperparameter optimization
     trials = Trials()
     # The best hyperparameters found
-    best = fmin(fn=f, space=space, algo=tpe.suggest, max_evals=max_evals, trials=trials)
+    best = fmin(fn=f, space=space, algo=tpe.suggest, max_evals=max_evals, trials=trials, rstate=np.random.default_rng(0))
     # Map the indices back to actual hyperparameter values
     criterion_options = ['gini', 'entropy']
     best_params = {
