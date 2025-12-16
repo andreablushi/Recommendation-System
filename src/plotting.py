@@ -48,8 +48,6 @@ def plot_recommendation_on_tree(clf: DecisionTreeClassifier,
         save: Whether to save the plot as PNG
         path: Path to save the plot
     """
-    print(f"Prefix trace features: {prefix_trace_features}")
-    print(f"Recommended conditions: {recommended_conditions}")
     # Create figure
     fig = plot.figure(figsize=(30, 20))
     ax = plot.gca()
@@ -77,10 +75,15 @@ def plot_recommendation_on_tree(clf: DecisionTreeClassifier,
             is_in_prefix = any(feature in node_text for feature in prefix_trace_features)
             
             # Check if node contains a recommended condition
-            is_recommended = False
+            recommendation_value = None
             for feat, val in recommended_conditions:
                 if feat in node_text:
-                    is_recommended = True
+                    recommendation_value = True
+                    # Mark the
+                    if val:
+                        recommendation_value = True
+                    else:
+                        recommendation_value = False
                     break
             
             if is_in_prefix:
@@ -88,12 +91,20 @@ def plot_recommendation_on_tree(clf: DecisionTreeClassifier,
                 bbox.set_edgecolor('blue')
                 bbox.set_linewidth(6)
                 bbox.set_linestyle('-')
-            elif is_recommended:
-                # Node is recommended: thick dashed green border
-                bbox.set_edgecolor('green')
-                bbox.set_linewidth(6)
-                bbox.set_linestyle('--')
-    
+
+            # If a recommendation exists for this node
+            elif recommendation_value != None:
+                if recommendation_value:
+                    # Node is recommended as true: thick dashed green border
+                    bbox.set_edgecolor('green')
+                    bbox.set_linewidth(6)
+                    bbox.set_linestyle('--')
+                else:
+                    # Node is not recommended as false: thick dashed red border
+                    bbox.set_edgecolor('red')
+                    bbox.set_linewidth(6)
+                    bbox.set_linestyle('--')
+
     # Create legend
     legend_elements = []
     legend_elements.append(
@@ -103,7 +114,12 @@ def plot_recommendation_on_tree(clf: DecisionTreeClassifier,
     legend_elements.append(
         mpatches.Patch(facecolor='lightgreen', edgecolor='green', 
                         linewidth=4, linestyle='--', 
-                        label=f'Recommendations ({len(recommended_conditions)} conditions)')
+                        label=f'Recommended as True')
+    )
+    legend_elements.append(
+        mpatches.Patch(facecolor='lightcoral', edgecolor='red', 
+                        linewidth=4, linestyle='--', 
+                        label='Recommended as False')
     )
     ax.legend(handles=legend_elements, loc='upper right', fontsize=20,
         frameon=True, shadow=True)
