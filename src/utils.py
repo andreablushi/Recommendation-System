@@ -454,71 +454,69 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
         test_traces.append((full_trace_features, row))
     # Initialize counters
     t_p = t_n = f_p = f_n = 0
-    
+    logger.info(f"Total recommendations to evaluate: {len(recommendations)}")
     # Process each recommendation (prefix trace)
     for prefix_features, recommendation in recommendations.items():
-        matching_trace = None
-        # Find the matching full trace in the test set
-        for full_trace_features, row in test_traces:
-            # Check if this prefix is a subset of the full trace features
-            # A prefix 'P' matches if all activities in 'P' are also in the 'full_trace_features'.
-            if set(prefix_features).issubset(full_trace_features):
-                matching_trace = row
-                # We found the matching full trace, exit the inner loop
-                break
-        
-        if matching_trace is None:
+        # Find all matching full trace in the test set
+        matching_traces = [
+            row for full_trace_features, row in test_traces
+            if set(prefix_features).issubset(full_trace_features)
+        ]
+        if len(matching_traces) == 0:
             logger.debug(f"No matching full trace found for prefix features: {set(prefix_features)}. Skipping.")
             continue
-
-        trace_id = matching_trace['trace_id']
-        ground_truth = matching_trace['label']
-        
-        # Extract the features of the matching full trace
-        full_trace_features = {
-            k for k, v in matching_trace.items() 
-            if k not in ['trace_id', 'label', 'prefix_length'] and v == True
-        }
-        
-        """
-        Check if the recommendation was followed. 
-         - A recommendation is followed if all recommended activities are present (True)
-         - and all recommended activities that should be absent (False) are indeed absent in the full trace.
-        """
-        recommendation_followed = True
-        
-        if len(recommendation) == 0:
-            # Empty recommendation means that no changes are needed
+        for matching_trace in matching_traces:
+            logger.info(f"Evaluating recommendation for trace:\n {matching_trace}")
+            logger.info(f"Prefix Features: {set(prefix_features)}")
+            trace_id = matching_trace['trace_id']
+            ground_truth = matching_trace['label']
+            # Extract the features of the matching full trace
+            full_trace_features = {
+                k for k, v in matching_trace.items() 
+                if k not in ['trace_id', 'label', 'prefix_length'] and v == True
+            }
+            
+            """
+            Check if the recommendation was followed. 
+            - A recommendation is followed if all recommended activities are present (True)
+            - and all recommended activities that should be absent (False) are indeed absent in the full trace.
+            """
             recommendation_followed = True
-        else:
-            # Check each recommended activity
-            for boolean_condition in recommendation:
-                activity = boolean_condition.feature
-                should_be_present = boolean_condition.value
-                # Check if the activity is present in the full trace
-                is_present = activity in full_trace_features
-                if should_be_present and not is_present:
-                    recommendation_followed = False
-                    break
-                if not should_be_present and is_present:
-                    recommendation_followed = False
-                    break
+            logger.info(f"Recommendation: {recommendation}")
+            if len(recommendation) == 0:
+                # Empty recommendation means no compliant paths were found
+                recommendation_followed = False
+            else:
+                # Check each recommended activity
+                for boolean_condition in recommendation:
+                    activity = boolean_condition.feature
+                    should_be_present = boolean_condition.value
+                    logger.info(f"Trace {trace_id}: Checking recommendation for activity '{activity}' to be {'present' if should_be_present else 'absent'}")
+                    # Check if the activity is present in the full trace
+                    is_present = activity in full_trace_features
+                    logger.info(f"Trace {trace_id}: Activity '{activity}' is {'present' if is_present else 'absent'} in the full trace")
+                    if should_be_present and not is_present:
+                        recommendation_followed = False
+                        break
+                    if not should_be_present and is_present:
+                        recommendation_followed = False
+                        break
         
-        logger.debug(f"Trace {trace_id}: truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
+            logger.debug(f"Trace {trace_id}: truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
 
-        # Classify based on the report's criteria (Section 2.6)
-        if recommendation_followed and ground_truth == 'true':
-            # True Positives: The recommended activity was followed in the actual trace, and the ground truth outcome is positive. 
-            t_p += 1
-        elif not recommendation_followed and ground_truth == 'false':
-            # True Negatives: The recommended activity was not followed in the actual trace, and the ground truth outcome is negative. 
-            t_n += 1
-        elif not recommendation_followed and ground_truth == 'true':
-            # False Positives: The recommended activity was not followed in the actual trace, but the ground truth outcome is positive. 
-            f_p += 1
-        elif recommendation_followed and ground_truth == 'false':
-            # False Negatives: The recommended activity was followed in the actual trace, but the ground truth outcome is negative. 
-            f_n += 1
+            # Classify based on the report's criteria (Section 2.6)
+            if recommendation_followed and ground_truth == 'true':
+                # True Positives: The recommended activity was followed in the actual trace, and the ground truth outcome is positive. 
+                t_p += 1
+            elif not recommendation_followed and ground_truth == 'false':
+                # True Negatives: The recommended activity was not followed in the actual trace, and the ground truth outcome is negative. 
+                t_n += 1
+            elif not recommendation_followed and ground_truth == 'true':
+                # False Positives: The recommended activity was not followed in the actual trace, but the ground truth outcome is positive. 
+                f_p += 1
+            elif recommendation_followed and ground_truth == 'false':
+                # False Negatives: The recommended activity was followed in the actual trace, but the ground truth outcome is negative. 
+                f_n += 1
 
     # Calculate metrics
     total_predictions = t_p + t_n + f_p + f_n
