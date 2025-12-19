@@ -401,6 +401,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
         # Skip already positive traces
         if ground_truth == 'true':
             logger.debug(f"Trace {trace_id} is already positive; no recommendation needed.")
+            recommendation[frozenset(exclude_keys_from_trace(prefix_trace).keys())] = None
             continue
         
         # Extract true valued activity features
@@ -459,57 +460,41 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
 
     # Initialize counters
     t_p = t_n = f_p = f_n = 0
-    
-    # For each recommendation
-    for prefix, recommendation in recommendations.items():
-        """
-        Find all matching traces in the test_log.
-        A trace is considered matching if the prefix for the recommendation is a subset of the full trace
-        TODO: in my opinion, a trace should be matching if prefix + true activity of recommendation are subset
-        """
-        matching_traces = [
-            (trace_features, full_trace) for trace_features, full_trace in test_traces
-            if set(prefix).issubset(trace_features)
-        ]
-        
-        # If no matches are found, continue with the next recommendation
-        if len(matching_traces) == 0:
-            logger.debug(f"No matching full trace found for prefix features: {set(prefix)}. Skipping.")
+
+    # For each trace in the test set
+    for trace_features, full_trace in test_traces:
+        trace_id = full_trace['trace_id']
+        ground_truth = full_trace['label']
+
+        logger.debug(f"Test Trace ID: {trace_id}, Features: {set(trace_features)}, Ground Truth: {ground_truth}")
+        # Find the recommendation generated from this trace
+        print(trace_features)
+        matching_recommendation = recommendations.get(trace_features, None)
+
+        # If the recommendation are None, it means the trace was already positive
+        if matching_recommendation is None:
+            print("AAA")
+            logger.debug(f"Trace {trace_id} was already positive; skipping recommendation evaluation.")
             continue
-        
-        logger.debug(f"Prefix Features: {set(prefix)}")
-        logger.debug(f"Found {len(matching_traces)} matching traces")
-        logger.debug(f"Recommendation: {recommendation}")
-        
-        # For each matching trace
-        for trace_features, matching_trace in matching_traces:
-            trace_id = matching_trace['trace_id']
-            ground_truth = matching_trace['label']
-            logger.debug(f"Evaluating recommendation for trace {trace_id}, ground-truth: {ground_truth}")
 
-            # Check if the recommendation are followed in the test trace
-            recommendation_followed = True
-            # If no recommendation are provided, they are followed by definition
-            if len(recommendation) == 0:
-                recommendation_followed = True
-            # Otherwise, we have to check every recommendation
-            else:
-                for boolean_condition in recommendation:
-                    activity = boolean_condition.feature
-                    # Checking if the activity should be present in the test trace
-                    should_be_present = boolean_condition.value
-                    logger.debug(f"Trace {trace_id}: Checking recommendation for activity '{activity}' to be {'present' if should_be_present else 'absent'}")
-                    # Check if the activity is present in the test trace
-                    is_present = activity in trace_features
-                    logger.debug(f"Trace {trace_id}: Activity '{activity}' is {'present' if is_present else 'absent'} in the full trace")
-                    
-                    if should_be_present and not is_present:
-                        recommendation_followed = False
-                        break
+        # Check if the recommendation was followed in the full trace
+        recommendation_followed = True
+        for boolean_condition in matching_recommendation:
+            activity = boolean_condition.feature
+            # Checking if the activity should be present in the test trace
+            should_be_present = boolean_condition.value
+            logger.debug(f"Trace {trace_id}: Checking recommendation for activity '{activity}' to be {'present' if should_be_present else 'absent'}")
+            # Check if the activity is present in the test trace
+            is_present = activity in trace_features
+            logger.debug(f"Trace {trace_id}: Activity '{activity}' is {'present' if is_present else 'absent'} in the full trace")
+            
+            if should_be_present and not is_present:
+                recommendation_followed = False
+                break
 
-                    if not should_be_present and is_present:
-                        recommendation_followed = False
-                        break
+            if not should_be_present and is_present:
+                recommendation_followed = False
+                break
         
             logger.debug(f"Trace {trace_id}: truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
 

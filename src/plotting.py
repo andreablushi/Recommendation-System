@@ -261,6 +261,7 @@ def print_recommendations(recommendations: dict, max_display: int = 5):
         Parameters:
             recommendations: A dictionary where keys are prefix features (tuples) and values are sets of recommended conditions.
             max_display: Maximum number of recommendations to display.
+            TODO: filter out None recommendations
     '''
     print(f"Displaying up to {max_display} recommendations:")
     for i, (prefix, recommendation) in enumerate(list(recommendations.items())[:max_display]):
