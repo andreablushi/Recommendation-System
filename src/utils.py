@@ -196,12 +196,8 @@ def hyperparameter_optimization(encoded_data:pd.DataFrame, max_evals:int=100, sp
 
     # Define the hyperparameter search space
     if space is None:
-        space = {
-            'max_depth': hp.choice('max_depth', range(1, 400)),
-            'max_features': hp.choice('max_features', range(1, 448)),
-            'criterion': hp.choice('criterion', ['gini', 'entropy']),
-            'random_state': 42
-        }
+        logger.error("Hyperparameter space must be provided.")
+        raise ValueError("Hyperparameter space must be provided.")
 
     # Run hyperparameter optimization
     trials = Trials()
@@ -244,7 +240,7 @@ def is_leaf(tree_, node_id: int) -> bool:
     '''
     return tree_.feature[node_id] == _tree.TREE_UNDEFINED
 
-def compute_confidence(tree_: DecisionTreeClassifier, node_id: int) -> float:
+def compute_path_score(tree_: DecisionTreeClassifier, node_id: int) -> float:
     '''
         Compute the confidence of a leaf node in the decision tree.
             Parameters:
@@ -253,9 +249,15 @@ def compute_confidence(tree_: DecisionTreeClassifier, node_id: int) -> float:
             Returns:
                 float: The confidence of the leaf node.
     '''
-    values = tree_.value[node_id][0]
-    return values[1]
+    node_values = tree_.value[node_id][0]
+    #return node_values[1] 
     
+    # Compute a weighted confidence based on the number of samples reaching the node   
+    node_samples = tree_.n_node_samples[node_id]
+    total_samples = tree_.n_node_samples[0]
+    weight = node_samples / total_samples
+    return node_values[1] * weight
+
 def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> list[tuple[Path, float]]:
     '''
         Extract all paths from root to leaves that predict the positive_class.
@@ -288,7 +290,7 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
     
             # If the prediction is positive, compute confidence and store the path
             if predicted_class:
-                confidence = compute_confidence(tree_, node)
+                confidence = compute_path_score(tree_, node)
                 logger.debug(f"Found positive path: {path_to_rule(current_path)} with confidence {confidence}")
                 paths.append((current_path, confidence))
             return
