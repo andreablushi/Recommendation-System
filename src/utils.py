@@ -254,10 +254,8 @@ def compute_confidence(tree_: DecisionTreeClassifier, node_id: int) -> float:
                 float: The confidence of the leaf node.
     '''
     values = tree_.value[node_id][0]
-    total_samples = sum(values)
-    positive_samples = values[1]  # assuming positive class is index 1
-    return positive_samples / total_samples if total_samples > 0 else 0.0
-
+    return values[1]
+    
 def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> list[tuple[Path, float]]:
     '''
         Extract all paths from root to leaves that predict the positive_class.
@@ -409,7 +407,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
         # Skip already positive traces
         if ground_truth == 'true':
             logger.debug(f"Trace {trace_id} is already positive; no recommendation needed.")
-            recommendation[frozenset(exclude_keys_from_trace(prefix_trace).keys())] = None 
+            recommendation[frozenset(exclude_keys_from_trace(prefix_trace).keys())] = None
             continue
         
         # Extract true valued activity features
@@ -438,6 +436,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
             key=lambda item: (item[1], -len(item[0]))  # item[1] = confidence, item[0] = path list
         )
         logger.info(f"Best Compliant Path: {path_to_rule(best_path)} with confidence {confidence}")
+        
         # Extract missing conditions as recommendations
         recommendation[prefix_trace_key] = get_missing_conditions(best_path, current_prefix_conditions)
 
@@ -464,51 +463,44 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
     test_traces = []
     for _, trace in test_set.iterrows():
         trace_features = frozenset(exclude_keys_from_trace(trace.to_dict()))
-        logger.debug(f"Test Trace ID: {trace['trace_id']}, Features: {set(trace_features)}, Label: {trace['label']}")
         test_traces.append((trace_features, trace))
 
     # Initialize counters
     t_p = t_n = f_p = f_n = 0
 
-    # For each trace in the test set
-    for trace_features, full_trace in test_traces:
+    # For each trace in the test set and its corresponding recommendation
+    for (trace_features, full_trace), (_, recommendation) in zip(test_traces, recommendations.items()):
         trace_id = full_trace['trace_id']
         ground_truth = full_trace['label']
-        # Find the recommendation generated from this trace
-        #TODO: this search doesn't work
-        matching_recommendation = next((rec for k, rec in recommendations.items() if k.issubset(trace_features)), None)
-
+                
         # If the recommendation are None, it means the trace was already positive
-        if matching_recommendation is None:
+        if recommendation is None:
             logger.debug(f"Trace {trace_id} was already positive; skipping recommendation evaluation.")
             continue
-
-        # If no recommendation was possible, count as not followed
-        if matching_recommendation == set():
+        
+        # If no recommendation was possible, skip the trace
+        if recommendation == set():
             logger.debug(f"Trace {trace_id} has negative outcome, but no recommendation was possible.")
             continue
-        
-        logger.debug(f"Trace ID: {trace_id} -> Matching Recommendation: {matching_recommendation}")
-
             
         # Check if the recommendation was followed in the full trace
         recommendation_followed = True
-        for boolean_condition in matching_recommendation:
+        for boolean_condition in recommendation:
             activity = boolean_condition.feature
+
             # Checking if the activity should be present in the test trace
             should_be_present = boolean_condition.value
             logger.debug(f"Trace {trace_id}: Checking recommendation for activity '{activity}' to be {'present' if should_be_present else 'absent'}")
+            
             # Check if the activity is present in the test trace
             is_present = activity in trace_features
             logger.debug(f"Trace {trace_id}: Activity '{activity}' is {'present' if is_present else 'absent'} in the full trace")
+            
             # If any condition is not met, the recommendation is not followed
-            if should_be_present and not is_present:
+            if (should_be_present and not is_present or 
+              not should_be_present and is_present):
                 recommendation_followed = False
                 break
-            if not should_be_present and is_present:
-                recommendation_followed = False
-                break
-        
         logger.debug(f"Trace {trace_id}: truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
 
         # Classify based on the report's criteria (Section 2.6)
