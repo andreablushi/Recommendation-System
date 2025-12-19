@@ -224,6 +224,17 @@ def hyperparameter_optimization(encoded_data:pd.DataFrame, max_evals:int=100, sp
     print("Criterion:", best_params['criterion'])
     return best_params
 
+def exclude_keys_from_trace(trace: dict, keys_to_exclude: set=['trace_id', 'label', 'prefix_length']) -> dict:
+    '''
+        Exclude specified keys from a trace dictionary, returning only keys with True values.
+            Parameters:
+                trace (dict): The original trace dictionary.
+                keys_to_exclude (set): Set of keys to exclude from the trace.
+            Returns:
+                dict: The trace dictionary with specified keys excluded.
+    '''
+    return {k: v for k, v in trace.items() if k not in keys_to_exclude and v is True}
+
 def is_leaf(tree_, node_id: int) -> bool:
     '''
         Check if a node in the decision tree is a leaf node.
@@ -375,8 +386,6 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
                 if the prefix is already positive, the recommendation is an empty set.
                 Otherwise, where possible, it contains the missing activities to reach a positive outcome.
     '''
-    # Define the key to exclude for activity features only
-    ACTIVITY_EXCLUDED_KEYS = {"trace_id", "label", "prefix_length"}
 
     logger.info("Extracting recommendations for the given prefix set.")
     recommendation = {}
@@ -395,10 +404,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
             continue
         
         # Extract true valued activity features
-        true_features = {
-            k: v for k, v in row.items() 
-            if k not in ACTIVITY_EXCLUDED_KEYS and v == True
-        }
+        true_features = exclude_keys_from_trace(prefix_trace)
         prefix_trace_key = frozenset(true_features.keys())
         logger.debug(f"Prefix Trace Features: {set(prefix_trace_key)}")
         
@@ -443,38 +449,38 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
                 dict: A dictionary containing evaluation metrics
     """
     logger.info("Evaluating recommendations")
+    logger.debug(f"Total recommendations to evaluate: {len(recommendations)}")
     
     # Pre-compute feature sets for all traces in the test set
     test_traces = []
-    for _, row in test_set.iterrows():
-        full_trace_features = frozenset(
-            k for k, v in row.items()
-            if k not in ['trace_id', 'label', 'prefix_length'] and v is True
-        )
-        test_traces.append((full_trace_features, row))
+    for _, trace in test_set.iterrows():
+        trace_features = frozenset(exclude_keys_from_trace(trace.to_dict()))
+        test_traces.append((trace_features, trace))
+
     # Initialize counters
     t_p = t_n = f_p = f_n = 0
-    logger.info(f"Total recommendations to evaluate: {len(recommendations)}")
-    # Process each recommendation (prefix trace)
-    for prefix_features, recommendation in recommendations.items():
-        # Find all matching full trace in the test set
+    
+    # For each recommendation
+    for prefix, recommendation in recommendations.items():
+        
+        # Find all the traces which prefix_features is a subset of the full trace features
         matching_traces = [
-            row for full_trace_features, row in test_traces
-            if set(prefix_features).issubset(full_trace_features)
+            (trace_features, full_trace) for trace_features, full_trace in test_traces
+            if set(prefix).issubset(trace_features)
         ]
+        
+        # If no matches are found, continue with the next recommendation
         if len(matching_traces) == 0:
-            logger.debug(f"No matching full trace found for prefix features: {set(prefix_features)}. Skipping.")
+            logger.debug(f"No matching full trace found for prefix features: {set(prefix)}. Skipping.")
             continue
-        for matching_trace in matching_traces:
-            logger.info(f"Evaluating recommendation for trace:\n {matching_trace}")
-            logger.info(f"Prefix Features: {set(prefix_features)}")
+        
+        # For each matching trace
+        for trace_features, matching_trace in matching_traces:
+            logger.debug(f"Evaluating recommendation for trace:\n {matching_trace}")
+            logger.debug(f"Prefix Features: {set(prefix)}")
+
             trace_id = matching_trace['trace_id']
             ground_truth = matching_trace['label']
-            # Extract the features of the matching full trace
-            full_trace_features = {
-                k for k, v in matching_trace.items() 
-                if k not in ['trace_id', 'label', 'prefix_length'] and v == True
-            }
             
             """
             Check if the recommendation was followed. 
@@ -482,7 +488,8 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
             - and all recommended activities that should be absent (False) are indeed absent in the full trace.
             """
             recommendation_followed = True
-            logger.info(f"Recommendation: {recommendation}")
+            logger.debug(f"Recommendation: {recommendation}")
+
             if len(recommendation) == 0:
                 # Empty recommendation means no compliant paths were found
                 recommendation_followed = False
@@ -491,10 +498,10 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
                 for boolean_condition in recommendation:
                     activity = boolean_condition.feature
                     should_be_present = boolean_condition.value
-                    logger.info(f"Trace {trace_id}: Checking recommendation for activity '{activity}' to be {'present' if should_be_present else 'absent'}")
+                    logger.debug(f"Trace {trace_id}: Checking recommendation for activity '{activity}' to be {'present' if should_be_present else 'absent'}")
                     # Check if the activity is present in the full trace
-                    is_present = activity in full_trace_features
-                    logger.info(f"Trace {trace_id}: Activity '{activity}' is {'present' if is_present else 'absent'} in the full trace")
+                    is_present = activity in trace_features
+                    logger.debug(f"Trace {trace_id}: Activity '{activity}' is {'present' if is_present else 'absent'} in the full trace")
                     if should_be_present and not is_present:
                         recommendation_followed = False
                         break
