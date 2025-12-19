@@ -269,4 +269,54 @@ def print_recommendations(recommendations: dict, max_display: int = 5):
             print(f"Prefix Trace {i+1}: {set(prefix)} -> Recommended Activities: {rec_str}")
         else: 
             print(f"Prefix Trace {i+1}: {set(prefix)} -> No changes recommended.")
-        
+
+def plot_prefix_length_statistics(statistics: dict, measurement: str, save: bool=False, path: str="docs/media/prefix_length_statistics.png"):
+    '''
+        Plot the prefix length statistics with two subplots.
+        Parameters:
+            statistics: A dictionary where keys are prefix lengths and values are dictionaries of metrics.
+            measurement: The specific measurement to plot (e.g., 'accuracy', 'f1').
+            save: Whether to save the plot as PNG
+    '''
+    # Prepare data for plotting
+    if measurement not in ['accuracy', 'f1']:
+        raise ValueError(f"Unsupported measurement: {measurement}. Supported measurements are: 'accuracy', 'f1'.")
+
+    TREE_METRIC = 'tree_' + measurement
+    RECOMMENDATION_METRIC = 'recommendation_' + measurement
+
+    # Extract data
+    prefix_lengths = list(statistics.keys())
+    tree_values = [statistics[pl].get(TREE_METRIC, 0) for pl in prefix_lengths]
+    recommendation_values = [statistics[pl].get(RECOMMENDATION_METRIC, 0) for pl in prefix_lengths]
+
+    # Create subplots
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
+
+    # Subplot 1: Decision Tree measurements
+    sub_plot = axes[0]
+    sub_plot.plot(prefix_lengths, tree_values, marker='o')
+    sub_plot.set_title('Decision Tree ' + measurement.capitalize(), fontsize=14)
+    sub_plot.set_xlabel('Prefix Length', fontsize=12)
+    sub_plot.set_ylabel(measurement.capitalize(), fontsize=12)
+    sub_plot.set_xticks(prefix_lengths)
+    sub_plot.set_ylim(0, 1)
+    sub_plot.grid(True)
+
+    # Subplot 2: Recommendation System
+    sub_plot = axes[1]
+    sub_plot.plot(prefix_lengths, recommendation_values, marker='s')
+    sub_plot.set_title('Recommendation System ' + measurement.capitalize(), fontsize=14)
+    sub_plot.set_xlabel('Prefix Length', fontsize=12)
+    sub_plot.set_xticks(prefix_lengths)
+    sub_plot.set_ylim(0, 1)
+    sub_plot.grid(True)
+
+    # Overall title
+    fig.suptitle(f'Prefix Length vs {measurement.capitalize()}', fontsize=16)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+    if save:
+        plt.savefig(path, bbox_inches='tight')
+
+    plt.show()

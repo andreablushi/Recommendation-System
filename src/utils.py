@@ -568,6 +568,8 @@ def compute_prefix_length_statistics(training_log: EventLog, test_log: EventLog,
                 composed by:
                     - 'tree_accuracy': Accuracy of the Decision Tree Classifier.
                     - 'tree_f1': F1-score of the Decision Tree Classifier.
+                    - 'recommendation_accuracy': Accuracy of the recommendation system.
+                    - 'recommendation_f1': F1-score of the recommendation system.
     '''
     logger.info(f"Computing statistics for prefix length {prefix_length}.")
     result = {}
