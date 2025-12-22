@@ -1,14 +1,14 @@
 \section{Evaluation}
-In this section, we present the evaluation results, for both $\textit{prefix\_length}=5$ and $\textit{prefix\_length}=10$, of the decision tree classifier and the recommendation system built on top of it.
+In this section, we present the evaluation results, for both $\textit{prefix\_length}=5$ and $\textit{prefix\_length}=11$, of the decision tree classifier and the recommendation system built on top of it.
 
 \subsection{Hyperparameters}
-Tables~\ref{tab:hyperparameters_5} and~\ref{tab:hyperparameters_10} show the optimized hyperparameters obtained through \textit{Hyperopt} for both prefix lengths. 
+Tables~\ref{tab:hyperparameters_5} and~\ref{tab:hyperparameters_11} show the optimized hyperparameters obtained through \textit{Hyperopt} for both prefix lengths. 
 \\\\
 For $\textit{prefix\_length}=5$, the optimizer selects a shallow tree with a maximum depth of $3$ and a small number of features considered at each split.
 This choice limits overfitting in a setting where only partial information about the trace is available, while still allowing the model to exploit the most informative activities.
 The use of the entropy criterion leads to more balanced and interpretable decision paths.
 \\\\
-For $\textit{prefix\_length}=10$, the optimal configuration still constrains the maximum depth to $3$, confirming that deeper trees do not provide additional benefits even when more information is available.
+For $\textit{prefix\_length}=11$, the optimal configuration still constrains the maximum depth to $3$, confirming that deeper trees do not provide additional benefits even when more information is available.
 However, the number of maximum features increases, indicating that longer prefixes allow the model to effectively leverage a richer set of activities.
 In this case, the Gini criterion is selected, suggesting that it better captures class separation when more contextual information is present.
 
@@ -40,14 +40,14 @@ In this case, the Gini criterion is selected, suggesting that it better captures
             Max Features & 3 \\
             \hline
         \end{tabular}
-        \caption{Optimized hyperparameters for the decision tree classifier for $\textit{prefix\_length}=10$.}
-        \label{tab:hyperparameters_10}
+        \caption{Optimized hyperparameters for the decision tree classifier for $\textit{prefix\_length}=11$.}
+        \label{tab:hyperparameters_11}
     \end{minipage}
 \end{table}
 
 
 \subsection{Decision Tree Structure}
-Figures~\ref{fig:decision_tree_5} and~\ref{fig:decision_tree_10} illustrate the structure of the trained decision trees.
+Figures~\ref{fig:decision_tree_5} and~\ref{fig:decision_tree_11} illustrate the structure of the trained decision trees.
 The color-coded leaf nodes (blue for positive outcomes, orange for negative outcomes) clearly show the distribution of predictions across different decision paths. 
 Both trees maintain interpretability thanks to their depth, as the controlled \textit{max\_depth} and \textit{max\_features} parameters prevent excessive branching.
 The tree structures provide valuable insights into which activities are most discriminative for predicting case outcomes, making the model transparent.
@@ -61,22 +61,22 @@ The tree structures provide valuable insights into which activities are most dis
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\textwidth]{../media/decision_tree_10.png}
-    \caption{Visualization of the trained decision tree classifier for $\textit{prefix\_length}=10$. }
-    \label{fig:decision_tree_10}
+    \includegraphics[width=0.8\textwidth]{../media/decision_tree_11.png}
+    \caption{Visualization of the trained decision tree classifier for $\textit{prefix\_length}=11$. }
+    \label{fig:decision_tree_11}
 \end{figure}
 
 \subsubsection{Evaluation Metrics}
 
-The classification results in Tables~\ref{tab:evaluation_metrics_5} and~\ref{tab:evaluation_metrics_10} demonstrate the predictive performance of our decision tree models. 
+The classification results in Tables~\ref{tab:evaluation_metrics_5} and~\ref{tab:evaluation_metrics_11} demonstrate the predictive performance of our decision tree models. 
 \\\\
 For $\textit{prefix\_length}=5$, these results indicate a reasonably balanced performance when only a limited portion of each trace is available.
 In this setting, the model is already able to capture meaningful patterns, but the reduced amount of information limits its power.
 \\\\
-The performance further improves for $\textit{prefix\_length}=10$, where the results suggest that longer prefixes provide more informative context, enabling the model to make more confident positive predictions.
+The performance further improves for $\textit{prefix\_length}=11$, where the results suggest that longer prefixes provide more informative context, enabling the model to make more confident positive predictions.
 Overall, the results confirm that increasing the \textit{prefix\_length} has a positive impact on outcome prediction, as more activities contribute to defining the case trajectory.
 \\\\
-The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:confusion_matrix_10} provide further insight into the distribution of predictions and misclassifications.
+The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:confusion_matrix_11} provide further insight into the distribution of predictions and misclassifications.
 
 \begin{figure}[H]
     \centering
@@ -89,9 +89,9 @@ The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:conf
     \hfill
     \begin{minipage}[t]{0.45\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{../media/confusion_matrix_10.png}
-        \caption{Confusion matrix of predictions in the test set ($\textit{prefix\_length}=10$).}
-        \label{fig:confusion_matrix_10}
+        \includegraphics[width=\textwidth]{../media/confusion_matrix_11.png}
+        \caption{Confusion matrix of predictions in the test set ($\textit{prefix\_length}=11$).}
+        \label{fig:confusion_matrix_11}
     \end{minipage}
 \end{figure}
 
@@ -119,14 +119,14 @@ The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:conf
             \hline
             \textbf{Metric} & \textbf{Value} \\
             \hline
-            Accuracy & 74.42\% \\
-            Precision & 83.97\% \\
-            Recall & 74.42\% \\
-            F1-Score & 76.04\% \\
+            Accuracy & 81.40\% \\
+            Precision & 84.45\% \\
+            Recall & 81.40\% \\
+            F1-Score & 82.21\% \\
             \hline
         \end{tabular}
-        \caption{Evaluation metrics for the decision tree classifier on the test set for $\textit{prefix\_length}=10$.}
-        \label{tab:evaluation_metrics_10}
+        \caption{Evaluation metrics for the decision tree classifier on the test set for $\textit{prefix\_length}=11$.}
+        \label{tab:evaluation_metrics_11}
     \end{minipage}
 \end{table}
 
@@ -167,17 +167,20 @@ This is illustrated in Figure~\ref{fig:recommendation_tree}, with the green dott
 \end{figure}
 
 \paragraph{Recommendations Quality}
-Tables~\ref{tab:evaluation_metrics_rec_5} and~\ref{tab:evaluation_metrics_rec_10} present the evaluation of our recommendation system.
+Tables~\ref{tab:evaluation_metrics_rec_5} and~\ref{tab:evaluation_metrics_rec_11} present the evaluation of our recommendation system.
 This values have to be considered as an approximation, since the ground truth is based on actual traces rather than hypothetical scenarios where recommendations were followed.
 \\\\
-For $\textit{prefix\_length}=5$, the recommendation system achieves moderate accuracy with balanced precision and recall.
-This indicates that, even with limited information, the system provides reasonably reliable recommendations that align with positive outcomes.
-The balanced precision and recall suggest that the system strikes a reasonable trade-off between suggesting necessary actions and avoiding over-recommendation, demonstrating practical utility in this early-stage setting.
+Overall, the results indicate that the limited size of the test dataset, influence the number of the recommendation and so their statistics.
 \\\\
-At $\textit{prefix\_length}=10$, both accuracy and precision improve notably, while recall remains relatively stable.
-This behavior indicates that with more contextual information available, the system becomes more confident and accurate in its recommendations.
-The increased precision shows that the recommendations are more targeted and relevant, while the maintained recall ensures that important suggestions are still captured.
-These results confirm that the recommendation system becomes more effective and reliable as more trace information becomes available, supporting its practical usage in real-world scenarios.
+For $\textit{prefix\_length}=5$, we can see as we achieve $0\%$ across all metrics, and all the few recommendations generated were considered as not followed.
+This outcome suggests that with very short prefixes, the system struggles to provide effective recommendations, likely due to insufficient context about the trace.
+Then they consistently failed to align with the actual trace outcomes.
+At this early stage of process execution, the activities observed may not yet be discriminative enough to distinguish between successful and unsuccessful process paths, resulting in recommendations that, while structurally valid according to the decision tree, do not reflect the actual dynamics of successful traces.
+\\\\
+At $\textit{prefix\_length}=11$, the recommendation system demonstrates substantial improvement across all metrics compared to shorter prefix lengths.
+The improved performance at this prefix length confirms that the recommendation system requires substantial contextual information to reliably identify patterns that distinguish successful from unsuccessful process executions and translate them into actionable recommendations.
+Then the higher number of recommendations followed indicates that the system is better able to suggest changes that align with actual successful outcomes in the traces.
+
 \begin{table}[H]
     \centering
     \begin{minipage}[t]{0.45\textwidth}
@@ -186,10 +189,10 @@ These results confirm that the recommendation system becomes more effective and 
             \hline
             \textbf{Metric} & \textbf{Value} \\
             \hline
-            Accuracy & 63.64\% \\
-            Precision & 30.43\% \\
-            Recall & 41.18\% \\
-            F1-Score & 28.57\% \\
+            Accuracy & 0.00\% \\
+            Precision & 0.00\% \\
+            Recall & 0.00\% \\
+            F1-Score & 0.00\% \\
             \hline
         \end{tabular}
         \caption{Evaluation metrics for the recommendation system on the test set for $\textit{prefix\_length}=5$.}
@@ -202,18 +205,18 @@ These results confirm that the recommendation system becomes more effective and 
             \hline
             \textbf{Metric} & \textbf{Value} \\
             \hline
-            Accuracy & 58.33\% \\
-            Precision & 41.18\% \\\
-            Recall & 48.28\% \\
-            F1-Score & 51.61\% \\
+            Accuracy & 46.67\% \\
+            Precision & 60.00\% \\
+            Recall & 33.33\% \\
+            F1-Score & 42.86\% \\
             \hline
         \end{tabular}
-        \caption{Evaluation metrics for the recommendation system on the test set for $\textit{prefix\_length}=10$.}
-        \label{tab:evaluation_metrics_rec_10}
+        \caption{Evaluation metrics for the recommendation system on the test set for $\textit{prefix\_length}=11$.}
+        \label{tab:evaluation_metrics_rec_11}
     \end{minipage}
 \end{table}
 
-For a more detailed understanding of the system's performance, we present the confusion matrices in Figures~\ref{fig:rec_confusion_matrix_5} and~\ref{fig:rec_confusion_matrix_10}.
+For a more detailed understanding of the system's performance, we present the confusion matrices in Figures~\ref{fig:rec_confusion_matrix_5} and~\ref{fig:rec_confusion_matrix_11}.
 \begin{figure}[H]
     \centering
     \begin{minipage}[t]{0.45\textwidth}
@@ -225,8 +228,18 @@ For a more detailed understanding of the system's performance, we present the co
     \hfill
     \begin{minipage}[t]{0.45\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{../media/recommendation_confusion_matrix_10.png}
-        \caption{Confusion matrix of recommendations($\textit{prefix\_length}=10$).}
-        \label{fig:rec_confusion_matrix_10}
+        \includegraphics[width=\textwidth]{../media/recommendation_confusion_matrix_11.png}
+        \caption{Confusion matrix of recommendations($\textit{prefix\_length}=11$).}
+        \label{fig:rec_confusion_matrix_11}
     \end{minipage}
+\end{figure}
+
+\subsection{Performance by Prefix Length}
+As shown in Figure~\ref{fig:prefix_length_f1_statistics}, the F1-score for the decision tree classifier remains relatively stable across different prefix lengths, while the recommendation system shows a more pronounced improvement as the prefix length increases.
+This trend reveals a fundamental difference between the two components: while the classifier can maintain consistent predictive performance regardless of prefix length, the recommendation system requires a minimum threshold of contextual information (approximately 7 activities) before it can generate meaningful recommendations.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{../media/prefix_length_f1_statistics.png}
+    \caption{The box plots illustrate the distribution of F1-scores across different prefix lengths for both the decision tree classifier and the recommendation system.}
+    \label{fig:prefix_length_f1_statistics}
 \end{figure}

@@ -5,7 +5,7 @@ from pm4py.objects.log.obj import EventLog, Trace
 import pm4py.objects.conversion.log.converter as log_converter
 import pandas as pd
 import numpy as np
-from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
+from hyperopt import fmin, tpe, STATUS_OK, Trials
 from sklearn.tree import DecisionTreeClassifier, _tree
 from sklearn.metrics import f1_score, accuracy_score
 from src.plotting import path_to_rule
@@ -21,7 +21,7 @@ logging.basicConfig(
 
 # Create and configure your application's logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  # Set your module's logger to DEBUG
+logger.setLevel(logging.INFO)  # Set your module's logger to INFO
 
 def import_log(file_path: str) -> EventLog:
     """

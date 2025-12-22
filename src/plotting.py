@@ -218,8 +218,8 @@ def plot_recommendation_confusion_matrix(recommendations_metrics: dict, save: bo
            # ... and label them with the correct class names
            xticklabels=classes, 
            yticklabels=classes,
-           ylabel='True label',
-           xlabel='Predicted label')
+           ylabel='Ground truth',
+           xlabel='Recommendation followed')
 
     # 5. Annotate cells with dynamic text color 
     # (White text on dark background, Dark text on light background)
