@@ -218,8 +218,8 @@ def plot_recommendation_confusion_matrix(recommendations_metrics: dict, save: bo
            # ... and label them with the correct class names
            xticklabels=classes, 
            yticklabels=classes,
-           ylabel='True label',
-           xlabel='Predicted label')
+           ylabel='Ground truth',
+           xlabel='Recommendation followed')
 
     # 5. Annotate cells with dynamic text color 
     # (White text on dark background, Dark text on light background)
@@ -262,6 +262,9 @@ def print_recommendations(recommendations: dict, max_display: int = 5):
             recommendations: A dictionary where keys are prefix features (tuples) and values are sets of recommended conditions.
             max_display: Maximum number of recommendations to display.
     '''
+
+    # Display up to max_display recommendations
+    print("Total non-None recommendations available:", len(recommendations))
     print(f"Displaying up to {max_display} recommendations:")
     for i, (prefix, recommendation) in enumerate(list(recommendations.items())[:max_display]):
         if len(recommendation):

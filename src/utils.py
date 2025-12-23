@@ -5,7 +5,7 @@ from pm4py.objects.log.obj import EventLog, Trace
 import pm4py.objects.conversion.log.converter as log_converter
 import pandas as pd
 import numpy as np
-from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
+from hyperopt import fmin, tpe, STATUS_OK, Trials
 from sklearn.tree import DecisionTreeClassifier, _tree
 from sklearn.metrics import f1_score, accuracy_score
 from src.plotting import path_to_rule
@@ -21,7 +21,7 @@ logging.basicConfig(
 
 # Create and configure your application's logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  # Set your module's logger to DEBUG
+logger.setLevel(logging.INFO)  # Set your module's logger to INFO
 
 def import_log(file_path: str) -> EventLog:
     """
@@ -196,12 +196,8 @@ def hyperparameter_optimization(encoded_data:pd.DataFrame, max_evals:int=100, sp
 
     # Define the hyperparameter search space
     if space is None:
-        space = {
-            'max_depth': hp.choice('max_depth', range(1, 400)),
-            'max_features': hp.choice('max_features', range(1, 448)),
-            'criterion': hp.choice('criterion', ['gini', 'entropy']),
-            'random_state': 42
-        }
+        logger.error("Hyperparameter space must be provided.")
+        raise ValueError("Hyperparameter space must be provided.")
 
     # Run hyperparameter optimization
     trials = Trials()
@@ -244,7 +240,7 @@ def is_leaf(tree_, node_id: int) -> bool:
     '''
     return tree_.feature[node_id] == _tree.TREE_UNDEFINED
 
-def compute_confidence(tree_: DecisionTreeClassifier, node_id: int) -> float:
+def compute_path_score(tree_: DecisionTreeClassifier, node_id: int) -> float:
     '''
         Compute the confidence of a leaf node in the decision tree.
             Parameters:
@@ -253,10 +249,14 @@ def compute_confidence(tree_: DecisionTreeClassifier, node_id: int) -> float:
             Returns:
                 float: The confidence of the leaf node.
     '''
-    values = tree_.value[node_id][0]
-    total_samples = sum(values)
-    positive_samples = values[1]  # assuming positive class is index 1
-    return positive_samples / total_samples if total_samples > 0 else 0.0
+    node_values = tree_.value[node_id][0]
+    #return node_values[1] 
+    
+    # Compute a weighted confidence based on the number of samples reaching the node   
+    node_samples = tree_.n_node_samples[node_id]
+    total_samples = tree_.n_node_samples[0]
+    weight = node_samples / total_samples
+    return node_values[1] * weight
 
 def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> list[tuple[Path, float]]:
     '''
@@ -290,7 +290,7 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
     
             # If the prediction is positive, compute confidence and store the path
             if predicted_class:
-                confidence = compute_confidence(tree_, node)
+                confidence = compute_path_score(tree_, node)
                 logger.debug(f"Found positive path: {path_to_rule(current_path)} with confidence {confidence}")
                 paths.append((current_path, confidence))
             return
@@ -363,6 +363,14 @@ def get_compliant_paths(paths: list[tuple[Path, float]], prefix_trace: dict) -> 
     return compliant
 
 def get_missing_conditions(best_path: Path, prefix_trace: dict) -> list[BooleanCondition]:
+    '''
+        Extract the missing conditions from the best_path that are not satisfied by the prefix_trace.
+            Parameters:
+                best_path: The best path (list of Condition objects).
+                prefix_trace: A dictionary representing the current prefix trace.
+            Returns:
+                list: A list of BooleanCondition objects representing the missing conditions.
+    '''
     recommendations = []
 
     for condition in best_path:
@@ -401,6 +409,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
         # Skip already positive traces
         if ground_truth == 'true':
             logger.debug(f"Trace {trace_id} is already positive; no recommendation needed.")
+            recommendation[frozenset(exclude_keys_from_trace(prefix_trace).keys())] = None
             continue
         
         # Extract true valued activity features
@@ -429,7 +438,8 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
             key=lambda item: (item[1], -len(item[0]))  # item[1] = confidence, item[0] = path list
         )
         logger.info(f"Best Compliant Path: {path_to_rule(best_path)} with confidence {confidence}")
-
+        
+        # Extract missing conditions as recommendations
         recommendation[prefix_trace_key] = get_missing_conditions(best_path, current_prefix_conditions)
 
     for k, v in recommendation.items():
@@ -459,73 +469,55 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
 
     # Initialize counters
     t_p = t_n = f_p = f_n = 0
-    
-    # For each recommendation
-    for prefix, recommendation in recommendations.items():
-        """
-        Find all matching traces in the test_log.
-        A trace is considered matching if the prefix for the recommendation is a subset of the full trace
-        TODO: in my opinion, a trace should be matching if prefix + true activity of recommendation are subset
-        """
-        matching_traces = [
-            (trace_features, full_trace) for trace_features, full_trace in test_traces
-            if set(prefix).issubset(trace_features)
-        ]
-        
-        # If no matches are found, continue with the next recommendation
-        if len(matching_traces) == 0:
-            logger.debug(f"No matching full trace found for prefix features: {set(prefix)}. Skipping.")
+
+    # For each trace in the test set and its corresponding recommendation
+    for (trace_features, full_trace), (_, recommendation) in zip(test_traces, recommendations.items()):
+        trace_id = full_trace['trace_id']
+        ground_truth = full_trace['label']
+                
+        # If the recommendation are None, it means the trace was already positive
+        if recommendation is None:
+            logger.debug(f"Trace {trace_id} was already positive; skipping recommendation evaluation.")
             continue
         
-        logger.debug(f"Prefix Features: {set(prefix)}")
-        logger.debug(f"Found {len(matching_traces)} matching traces")
-        logger.debug(f"Recommendation: {recommendation}")
-        
-        # For each matching trace
-        for trace_features, matching_trace in matching_traces:
-            trace_id = matching_trace['trace_id']
-            ground_truth = matching_trace['label']
-            logger.debug(f"Evaluating recommendation for trace {trace_id}, ground-truth: {ground_truth}")
+        recommendation_followed = True
+        # If no recommendation was possible, count as not followed, the next loop will be skipped implicitly since it's empty
+        if recommendation == set():
+            logger.debug(f"Trace {trace_id} has negative outcome, but no recommendation was possible.")
+            recommendation_followed = False
+            
+        # Check if the recommendation was followed in the full trace
+        for boolean_condition in recommendation:
+            activity = boolean_condition.feature
 
-            # Check if the recommendation are followed in the test trace
-            recommendation_followed = True
-            # If no recommendation are provided, they are followed by definition
-            if len(recommendation) == 0:
-                recommendation_followed = True
-            # Otherwise, we have to check every recommendation
-            else:
-                for boolean_condition in recommendation:
-                    activity = boolean_condition.feature
-                    # Checking if the activity should be present in the test trace
-                    should_be_present = boolean_condition.value
-                    logger.debug(f"Trace {trace_id}: Checking recommendation for activity '{activity}' to be {'present' if should_be_present else 'absent'}")
-                    # Check if the activity is present in the test trace
-                    is_present = activity in trace_features
-                    logger.debug(f"Trace {trace_id}: Activity '{activity}' is {'present' if is_present else 'absent'} in the full trace")
-                    
-                    if should_be_present and not is_present:
-                        recommendation_followed = False
-                        break
+            # Checking if the activity should be present in the test trace
+            should_be_present = boolean_condition.value
+            logger.debug(f"Trace {trace_id}: Checking recommendation for activity '{activity}' to be {'present' if should_be_present else 'absent'}")
+            
+            # Check if the activity is present in the test trace
+            is_present = activity in trace_features
+            logger.debug(f"Trace {trace_id}: Activity '{activity}' is {'present' if is_present else 'absent'} in the full trace")
+            
+            # If any condition is not met, the recommendation is not followed
+            if (should_be_present and not is_present or 
+              not should_be_present and is_present):
+                recommendation_followed = False
+                break
+        logger.debug(f"Trace {trace_id}: truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
 
-                    if not should_be_present and is_present:
-                        recommendation_followed = False
-                        break
-        
-            logger.debug(f"Trace {trace_id}: truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
-
-            # Classify based on the report's criteria (Section 2.6)
-            if recommendation_followed and ground_truth == 'true':
-                # True Positives: The recommended activity was followed in the actual trace, and the ground truth outcome is positive. 
-                t_p += 1
-            elif not recommendation_followed and ground_truth == 'false':
-                # True Negatives: The recommended activity was not followed in the actual trace, and the ground truth outcome is negative. 
-                t_n += 1
-            elif not recommendation_followed and ground_truth == 'true':
-                # False Positives: The recommended activity was not followed in the actual trace, but the ground truth outcome is positive. 
-                f_p += 1
-            elif recommendation_followed and ground_truth == 'false':
-                # False Negatives: The recommended activity was followed in the actual trace, but the ground truth outcome is negative. 
-                f_n += 1
+        # Classify based on the report's criteria (Section 2.6)
+        if recommendation_followed and ground_truth == 'true':
+            # True Positives: The recommended activity was followed in the actual trace, and the ground truth outcome is positive. 
+            t_p += 1
+        elif not recommendation_followed and ground_truth == 'false':
+            # True Negatives: The recommended activity was not followed in the actual trace, and the ground truth outcome is negative. 
+            t_n += 1
+        elif not recommendation_followed and ground_truth == 'true':
+            # False Negatives: The recommended activity was not followed in the actual trace, but the ground truth outcome is positive. 
+            f_n += 1
+        elif recommendation_followed and ground_truth == 'false':
+            # False Positives: The recommended activity was followed in the actual trace, but the ground truth outcome is negative. 
+            f_p += 1
 
     # Calculate metrics
     total_predictions = t_p + t_n + f_p + f_n
