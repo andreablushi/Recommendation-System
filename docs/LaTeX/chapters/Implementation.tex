@@ -1,69 +1,65 @@
 \section{Implementation}
-A recommendation system was implemented using a decision tree classifier to analyze production event logs.
-The implementation was achieved in Python, leveraging libraries such as \textit{PM4Py} for process mining tasks and \textit{scikit-learn} for machine learning functionality.
-The execution flow of our implementation resides within the \textit{notebook.ipynb} file, which calls all the designed utility functions.
+A recommendation system based on a decision tree classifier was implemented to analyze production event logs.
+The implementation was developed in Python, leveraging the \textit{PM4Py} library for process mining tasks and the \textit{scikit-learn} for machine learning functionality.
+The overall execution workflow is encapsulated in the \textit{notebook.ipynb} file, which orchestrates the execution of all supporting utility functions.
 
 \subsection{Encoding the Event Log}
-We began by importing the event log file, which is in \textit{XES} format, using the \textit{PM4Py} library. 
-We then converted this file into a \textit{PM4Py} event log object suitable for subsequent process mining tasks.
+The event log, provided in \textit{XES} format, was imported using the \textit{PM4Py} library and converted
+into a \textit{PM4Py} event log object suitable for subsequent processing.
+A pruned version of the event log was then constructed by considering only trace prefixes.
+Specifically, each trace was truncated to a fixed number of events defined by the parameter \textit{prefix\_length}.
+Since ongoing traces in real-world scenarios are inherently incomplete, the classifier was trained exclusively on such prefixes.
 \\\\
-A pruned copy of the event log was created to consider only the prefixes of each trace.
-To achieve this, each trace in the log was truncated to \textit{prefix\_length} events.
-Since the partial ongoing trace in a real-world scenario is incomplete, we trained the classifier 
-exclusively on the prefixes of the traces.
+Subsequently, the set of unique activity names was extracted from the complete event log and used to define the feature space.
+In addition to the activity-based features, each encoded trace included a trace identifier,
+the prefix length, and a ground truth label indicating whether the trace outcome was positive or negative.
 \\\\
-Next, we extracted the unique activity names from the complete event log to serve as columns (features) for the encoding step.
-In addition to these, we included the trace identifier, the prefix length, and the ground truth label, 
-which indicates whether the trace outcome was positive or negative.
-\\\\
-To prepare this data for training a decision tree classifier, the pruned events were encoded using a \textit{Boolean encoding} scheme.
-This encoding involved creating binary features for each unique activity name. 
-For each trace, if an activity was present within the trace, the corresponding feature in that row was set to true (1); otherwise, it was set to false (0).
-This approach allows for the creation of a feature set with a fixed number of columns, eliminating the need to pad traces to a uniform length.
-Upon completion, we obtained a \textit{DataFrame} in which each row represented a trace, while the feature columns indicated the presence or absence of specific activities within that trace.
+To enable training with a decision tree classifier, the pruned traces were encoded using a \textit{Boolean encoding} representation.
+For each unique activity, a binary feature was created indicating whether the activity occurred at least once within the trace prefix.
+This encoding scheme results in a fixed-dimensional feature space and avoids the need to pad traces to a uniform length.
+The final outcome of this step is a tabular \textit{DataFrame} in which each row corresponds to a trace prefix
+and each feature column represents the presence or absence of a specific activity.
 
 \subsection{Training the Decision Tree Classifier}
 Following the encoding of the pruned event log, a decision tree classifier was trained using the \textit{scikit-learn} library.  
-We separated the encoded log into features $(\boldsymbol{X})$, which were derived by removing the trace identifier and label columns, and labels $(\boldsymbol{y})$, which represented the ground truth extracted directly from the log.  
-The dataset had been pre-partitioned in the original \textit{XES} file into distinct training and testing sets; these partitions were used to train and evaluate the classifier, respectively.
+The encoded dataset was partitioned into a feature matrix $\boldsymbol{X}$, obtained by excluding 
+the trace identifier and label columns, and a label vector $\boldsymbol{y}$ containing the ground truth outcomes.
+The original \textit{XES} file provided a predefined split between training and test sets, which was preserved during this process.
 \\\\
-After training the classifier, we visualized the learned decision rules by plotting the decision tree using built-in \textit{scikit-learn} functionality.  
+After training the classifier, the learned decision rules were examined by visualizing the resulting decision tree using the visualization utilities provided by \textit{scikit-learn}.
 
 \subsection{Optimizing the Classifier Hyperparameters}
-To enhance the performance of our decision tree classifier, we employed the \textit{Hyperopt} library to perform hyperparameter optimization.
-This tool systematically explores a defined search space, iteratively testing combinations of critical hyperparameters—such as \textit{max\_depth}, \textit{max\_features}, and the split criterion (e.g., \textit{Gini} or \textit{entropy})—to identify the optimal configuration.
-During each trial, the model was trained and evaluated using the $F_1$-score as the primary performance metric. 
-Only the configuration that resulted in the highest $F_1$-score was retained for the final model.
-The \textit{Hyperopt} library also allowed us to define a search space and to specify the maximum number of iterations to perform.
+To improve classification performance, hyperparameter optimization was conducted using the \textit{Hyperopt} library.
+This tool systematically explores a predefined search space, iteratively testing combinations of critical hyperparameters—such as \textit{max\_depth}, \textit{max\_features}, and the split criterion (e.g., \textit{Gini} or \textit{entropy})—to identify the optimal configuration.
+For each configuration, the model was trained and evaluated using the $F_1$-score as the primary performance metric.
+The hyperparameter configuration yielding the highest $F_1$-score was selected as the final model.
 
-In order to achieve reproducible results, a fixed random seed was set for all stochastic processes involved in the optimization and training phases.
+To ensure reproducibility, a fixed random seed was set for all stochastic processes involved in the optimization and training phases.
 
 \subsection{Generating Predictions}
-After training, the optimized classifier was used to generate predictions on the test set. 
-The predicted labels were obtained by applying the trained model to the feature set derived from the encoded test log. 
-Similar to the training phase, the features $(\boldsymbol{X}_{test})$ were prepared by removing the trace identifier and ground truth label columns. 
+The optimized classifier was subsequently applied on the test set to generate predictions. 
+The predicted labels were obtained by applying the model to the feature set derived from the encoded test log. 
+Similar to the training phase, the features $(\boldsymbol{X}_{test})$ were constructed by removing the trace identifier and ground truth label columns. 
 The classifier's performance was subsequently evaluated using standard scikit-learn metrics, including \textit{Accuracy}, \textit{Precision}, \textit{Recall}, and the \textit{F1-score}.
 
 \subsection{Extracting Recommendations}
-Given the interpretability inherent in the decision tree structure, the model can provide proactive recommendations specifically for traces predicted to result in a negative outcome.
-The process for generating these recommendations involved three main steps:
+Due to the inherent interpretability of decision tree models, the trained classifier can be used to derive proactive recommendations for traces predicted to result in a negative outcome.
+The recommendation generation procedure consists of three main steps:
 \begin{enumerate}
-    \item \textbf{Extracting Positive Paths}: identify all distinct paths in the decision tree that lead to a leaf node associated with a positive outcome.
-    \item \textbf{Filtering Compliant Paths}: for a given negatively-predicted trace prefix, filter the positive paths to find those that are compliant 
-    (i.e., whose conditions are not violated by the activities already present in the trace).
-    \item \textbf{Generating Recommendations}: from the compliant positive paths, select the one with the highest confidence score. Determine the set of 
-    activities required to complete that path.
+    \item \textbf{Extracting Positive Paths}: identifying all distinct decision paths leading to leaf nodes associated with a positive outcome.
+    \item \textbf{Filtering Compliant Paths}: selecting, for a given negatively predicted trace prefix, those positive paths whose conditions are not violated by the activities already observed.
+    \item \textbf{Generating Recommendations}: choosing the compliant positive path with the highest confidence score and determining the activities required to complete that path.
 \end{enumerate}
-Note that the function signature differs from the originally requested one.
-In particular, the \textit{class\_values} parameter was removed to simplify the implementation, since our setting is restricted to binary classification only.
+It should be noted that the implemented function signature differs from the originally proposed one.
+In particular, the \textit{class\_values} parameter was removed to simplify the implementation, as the experimental setting is restricted to binary classification.
 
 \paragraph{Extracting Positive Paths from the Decision Tree:}
-To extract all positive paths from the decision tree, we traversed the tree structure starting from the root node using a \textit{Depth-first search} (DFS) approach.
-At each decision node in the path, we recorded the feature, the operator (e.g., $\le$, $>$), and the threshold that leads to the next node.
-\\Upon reaching a leaf node, if the node's label corresponded to a positive outcome, the entire path, along with its associated confidence score, was stored as a positive path.
-\\A weighted confidence score was introduced for decision tree paths to mitigate the issue of paths achieving a confidence of 1 with only a single supporting instance. 
-The weighting was based on the number of samples reaching each node, ensuring that recommendations were not derived from statistically unrepresentative outlier paths.
-
+To extract all positive paths from the decision tree, the decision tree is traversed from the root node using a \textit{depth-first search} (DFS) strategy.
+At each internal node, the corresponding feature, comparison operator (e.g., $\leq$, $>$), and threshold value were recorded.
+Upon reaching a leaf node labeled with a  positive outcome, the complete sequence of conditions along the path, together with its associated confidence score, was stored.
+\\\\To prevent the selection of statistically unrepresentative paths, a weighted confidence score was employed.
+This weighting incorporates the number of samples reaching each leaf node, thereby penalizing paths that achieve high confidence based on only a small number of observations.
+\\\\The Algorithm \ref{alg:get_positive_paths} formally defines the procedure for extracting positive paths from the decision tree.
 \begin{algorithm}[H]
     \label{alg:get_positive_paths}
     \caption{Get Positive Paths}
@@ -88,26 +84,28 @@ The weighting was based on the number of samples reaching each node, ensuring th
 \end{algorithm}
 
 \paragraph{Filtering Compliant Paths:}
-After all positive paths were extracted, for each prefix trace predicted as negative, we filtered the set to retain only the \textit{compliant} paths.
-A path is defined as compliant if and only if none of the feature conditions along the path are violated by the set of activities currently present in the prefix trace.
-Among all compliant paths, the one with the highest confidence score was selected. In case of a tie in confidence, the shortest path was chosen as the tie-breaker.
+For each trace prefix predicted as negative, the set of extracted positive paths was filtered to retain only those that are compliant with the observed activities.
+A path is defined as compliant if none of its feature conditions are violated along the path by the activities present in the trace prefix.
+Among all compliant paths, the one with the highest confidence score was selected.
+In case of a tie in confidence, the shortest path was chosen as a secondary selection criterion.
 
 \paragraph{Generating Recommendations:}
-Once the most suitable positive compliant path was identified, recommendations were generated by determining the activities that needed to be added to the current trace to follow the selected path.
-For each test-set prefix, the recommendation set is defined as:
+Once the most suitable positive compliant path was identified, recommendations were generated by determining which activities 
+needed to be added to the current trace in order to satisfy the conditions of that path.
+For each test-set prefix, the recommendation set is defined as follows:
 \begin{itemize}
-    \item \textit{None} if the trace was already predicted as positive;
-    \item The empty set if no compliant positive path was found;
-    \item Otherwise, the set of activities corresponding to the conditions in the selected positive path that were not satisfied by the current prefix trace.
+    \item \textit{None}, if the trace was already predicted to result in a positive outcome;
+    \item the empty set, if no compliant positive path could be identified;
+    \item otherwise, the set of activities corresponding to the unsatisfied conditions along the selected positive path.
 \end{itemize}
 
 \subsection{Evaluation of Recommendations}
-To evaluate the quality of the generated recommendations, we compared them against the actual full traces in the test set, using the encoded test set as ground truth.
-For each trace in the test set, we matched it with its corresponding prefix and the recommendation generated for that prefix.
-\\\\If a recommendation was defined as \textit{None}, it was skipped, as this indicates that no action was necessary because the trace was already predicted to have a positive outcome.
-Conversely, if a recommendation was an empty set, it was considered \textit{not followed}, since the system was unable to suggest any corrective action for the negative prediction.
-A recommendation was considered \textit{followed} if and only if all the associated Boolean conditions were satisfied in the full trace.
-Each condition specifies whether a given activity should be present or absent; if any single condition was violated, the recommendation was marked as \textit{not followed}.
+The quality of the generated recommendations was evaluated by comparing them against the complete traces in the test set, which serve as ground truth.
+Each trace in the test set was matched with its corresponding prefix and the recommendation generated for that prefix.
+\\\\Recommendations for which no action was required were excluded from the evaluation.
+Recommendations consisting of an empty set were considered \emph{not followed}, reflecting the absence of a feasible corrective action.
+A recommendation was considered \emph{followed} if and only if all Boolean conditions associated with the selected path were satisfied in the full trace.
+If any condition was violated, the recommendation was classified as \emph{not followed}.
 \\\\The recommendation outcome (followed or not followed) was then compared with the ground truth label of the trace to derive an approximate confusion matrix defined as follows:
 \begin{itemize}
     \item \textbf{True Positives}: the recommendation was followed in the actual trace and the ground truth outcome is positive.
@@ -116,4 +114,4 @@ Each condition specifies whether a given activity should be present or absent; i
     \item \textbf{False Negatives}: the recommendation was not followed in the actual trace but the ground truth outcome is positive.
 \end{itemize}
 
-Based on this confusion matrix, we computed standard evaluation metrics, such as accuracy, precision, recall, and F1-score, to assess the effectiveness of the generated recommendations.
+Based on this confusion matrix, standard evaluation metrics such as accuracy, precision, recall, and F1-score were computed to assess the effectiveness of the generated recommendations.

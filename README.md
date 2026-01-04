@@ -30,7 +30,6 @@ The system uses Boolean encoding of process activities and hyperparameter optimi
 ### Required Software
 - **Python 3.8+**: [Download Python](https://www.python.org/downloads/)
 - **pip**: Package installer for Python (usually included with Python)
-- **Jupyter Notebook**: Installed via `requirements.txt`
 - **Git**: [Download Git](https://git-scm.com/downloads) (optional, for cloning)
 
 ## 3. Repository Structure
