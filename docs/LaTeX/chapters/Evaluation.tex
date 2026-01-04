@@ -1,8 +1,8 @@
 \section{Evaluation}
-In this section, we present the evaluation results for both $\textit{prefix\_length}=5$ and $\textit{prefix\_length}=11$ of the decision tree classifier and the recommendation system built on top of it.
+This section presents the evaluation results for both $\textit{prefix\_length}=5$ and $\textit{prefix\_length}=11$ of the decision tree classifier and the recommendation system built on top of it.
 
 \subsection{Hyperparameters}
-Tables~\ref{tab:hyperparameters_5} and~\ref{tab:hyperparameters_11} show the optimized hyperparameters obtained through \textit{Hyperopt} for both prefix lengths. 
+Tables~\ref{tab:hyperparameters_5} and~\ref{tab:hyperparameters_11} report the optimized hyperparameters obtained through \textit{Hyperopt} for both prefix lengths. 
 \\\\
 For $\textit{prefix\_length}=5$, the optimizer selects a shallow tree with a maximum depth of $3$ and a small number of features considered at each split.
 This choice limits overfitting in a setting where only partial information about the trace is available, while still allowing the model to exploit the most informative activities.
@@ -47,9 +47,9 @@ In this case, the Gini criterion is selected, suggesting that it better captures
 
 
 \subsection{Decision Tree Structure}
-Figures~\ref{fig:decision_tree_5} and~\ref{fig:decision_tree_11} illustrate the structure of the trained decision trees.
-The color-coded leaf nodes (blue for positive outcomes, orange for negative outcomes) clearly show the distribution of predictions across different decision paths. 
-Both trees maintain interpretability thanks to their depth, as the controlled \textit{max\_depth} and \textit{max\_features} parameters prevent excessive branching.
+Figures~\ref{fig:decision_tree_5} and~\ref{fig:decision_tree_11} illustrate the structure of the trained decision trees for the two prefix lengths.
+Leaf nodes are color-coded (blue for positive outcomes, orange for negative outcomes) to indicate prediction distributions.
+The controlled maximum depth and limited number of features ensure interpretability, preventing excessive branching.
 The tree structures provide valuable insights into which activities are most discriminative for predicting case outcomes, making the model transparent.
 
 \begin{figure}[H]
@@ -67,17 +67,12 @@ The tree structures provide valuable insights into which activities are most dis
 \end{figure}
 
 \subsubsection{Evaluation Metrics}
-
-The classification results in Tables~\ref{tab:evaluation_metrics_5} and~\ref{tab:evaluation_metrics_11} demonstrate the predictive performance of our decision tree models. 
+The predictive performance of the decision tree classifiers is summarized in Tables~\ref{tab:evaluation_metrics_5} and~\ref{tab:evaluation_metrics_11}.
 \\\\
-For $\textit{prefix\_length}=5$, these results indicate reasonably balanced performance when only a limited portion of each trace is available.
-In this setting, the model is already able to capture meaningful patterns, but the reduced amount of information limits its power.
-\\\\
-The performance further improves for $\textit{prefix\_length}=11$, where the results suggest that longer prefixes provide more informative context, enabling the model to make more confident positive predictions.
-Overall, the results confirm that increasing the \textit{prefix\_length} has a positive impact on outcome prediction, as more activities contribute to defining the case trajectory.
-\\\\
-The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:confusion_matrix_11} provide further insight into the distribution of predictions and misclassifications.
-
+For $\textit{prefix\_length}=5$, the model exhibits moderately balanced performance, capturing meaningful patterns despite limited information in the trace prefixes.
+Increasing the prefix length to $\textit{prefix\_length}=11$ provides additional contextual information, enabling the model to make more confident positive predictions.
+These results confirm that increasing the prefix length generally improves outcome prediction, as more activities contribute to defining the process trajectory.
+Confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:confusion_matrix_11} provide further insight into the distribution of predictions and misclassifications.
 \begin{figure}[H]
     \centering
     \begin{minipage}[t]{0.45\textwidth}
@@ -133,7 +128,7 @@ The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:conf
 \subsection{Recommendation Analysis}
 
 \paragraph{Recommendation Generation}
-For the sake of simplicity in explaining the recommendation extraction process, we chose to consider the tree in Figure~\ref{fig:decision_tree_recommendation}.
+To illustrate recommendation extraction, a simplified decision tree is considered (Figure~\ref{fig:decision_tree_recommendation}).
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.8\textwidth]{../media/decision_tree_small.png}
@@ -148,14 +143,14 @@ Applying the extraction of positive paths (Algorithm~\ref{alg:get_positive_paths
     \item Path 3: \textit{Turning Q.C.} = T $\wedge$ \textit{Turning \& Milling - Machine 10} = F $\wedge$ \textit{Final Inspection Q.C.} = F $\wedge$ \textit{Packing} = T with confidence $1.0$;
     \item Path 4: \textit{Turning Q.C.} = T $\wedge$ \textit{Turning \& Milling - Machine 10} = T with confidence $1.0$;
 \end{itemize}
-Now, suppose a prefix trace that has the following activities: \{\textit{Final Inspection Q.C.}: True, \textit{Packing}: True, \textit{Grinding Rework - Machine 27}: True\}, represented by the orange path in Figure~\ref{fig:decision_tree_recommendation}, is predicted as false.
-To find the recommendations for this trace, we first filter the positive paths to find the compliant ones.
+Given a trace prefix $\sigma = \{\textit{Final Inspection Q.C.}=T, \textit{Packing}=T, \textit{Grinding Rework - Machine 27}=T\}$ predicted as negative, compliant paths are identified as follows:
+Given a trace prefix $\sigma = \{\textit{Final Inspection Q.C.}=T, \textit{Packing}=T, \textit{Grinding Rework - Machine 27}=T\}$ predicted as negative, compliant paths are identified as follows:
 \begin{itemize}
-    \item Path 1 and Path 2 are not compliant because they require \textit{Grinding Rework - Machine 27} = F, which is violated by the trace;
-    \item Path 3 is compliant because none of its conditions are violated by the trace;
-    \item Path 4 is also not compliant because it requires \textit{Final Inspection Q.C.} = F, which is violated by the trace.
+    \item Paths 1 and 2 are non-compliant, violating \textit{Grinding Rework - Machine 27}=F.
+    \item Path 3 is compliant.
+    \item Path 4 is non-compliant, violating \textit{Final Inspection Q.C.}=F.
 \end{itemize}
-Given this, we can derive the recommendations for the given prefix trace as the activities that need to be added to follow Path 3.
+Given this, the recommendations for the given prefix trace are the activities that need to be added to follow Path 3.
 Since both \textit{Turning Q.C.} and \textit{Turning \& Milling - Machine 10} need to be true to follow Path 3, the recommended activities will be those.
 This is illustrated in Figure~\ref{fig:recommendation_tree}, with the green dotted nodes.
 
@@ -168,19 +163,12 @@ This is illustrated in Figure~\ref{fig:recommendation_tree}, with the green dott
 
 \paragraph{Recommendations Quality}
 Tables~\ref{tab:evaluation_metrics_rec_5} and~\ref{tab:evaluation_metrics_rec_11} present the evaluation of our recommendation system.
-These values have to be considered as an approximation, since the ground truth is based on actual traces rather than hypothetical scenarios where recommendations were followed.
+Metrics are approximations, as the ground truth is based on actual traces rather than hypothetical scenarios in which recommendations were followed.
 \\\\
-Overall, the results indicate that the limited size of the test dataset influences the number of recommendations and, consequently, their statistics.
-\\\\
-For $\textit{prefix\_length}=5$, we can see that we achieve $0\%$ across all metrics, and the few recommendations generated were considered not followed.
-This outcome suggests that with very short prefixes, the system struggles to provide effective recommendations, likely due to insufficient context about the trace.
-They then consistently failed to align with the actual trace outcomes.
-At this early stage of process execution, the activities observed may not yet be discriminative enough to distinguish between successful and unsuccessful process paths, resulting in recommendations that, while structurally valid according to the decision tree, do not reflect the actual dynamics of successful traces.
-\\\\
-At $\textit{prefix\_length}=11$, the recommendation system demonstrates substantial improvement across all metrics compared to shorter prefix lengths.
-The improved performance at this prefix length confirms that the recommendation system requires substantial contextual information to reliably identify patterns that distinguish successful from unsuccessful process executions and translate them into actionable recommendations.
-The higher number of recommendations followed indicates that the system is better able to suggest changes that align with actual successful outcomes in the traces.
-
+For $\textit{prefix\_length}=5$, all metrics are $0\%$, indicating that the few generated recommendations were not followed.
+This is likely due to insufficient contextual information in very short prefixes, making it difficult for the system to provide effective suggestions.
+\\\\For $\textit{prefix\_length}=11$, the recommendation system demonstrates substantial improvement across all metrics compared to shorter prefix lengths.
+This demonstrates that a sufficient prefix length is required for the recommendation system to reliably identify actionable patterns and align them with successful outcomes.
 \begin{table}[H]
     \centering
     \begin{minipage}[t]{0.45\textwidth}
@@ -216,7 +204,7 @@ The higher number of recommendations followed indicates that the system is bette
     \end{minipage}
 \end{table}
 
-For a more detailed understanding of the system's performance, we present the confusion matrices in Figures~\ref{fig:rec_confusion_matrix_5} and~\ref{fig:rec_confusion_matrix_11}.
+Figures~\ref{fig:rec_confusion_matrix_5} and~\ref{fig:rec_confusion_matrix_11} present the corresponding confusion matrices, providing further insight into recommendation outcomes.
 \begin{figure}[H]
     \centering
     \begin{minipage}[t]{0.45\textwidth}
@@ -235,8 +223,9 @@ For a more detailed understanding of the system's performance, we present the co
 \end{figure}
 
 \subsection{Performance by Prefix Length}
-As shown in Figure~\ref{fig:prefix_length_f1_statistics}, the F1-score for the decision tree classifier remains relatively stable across different prefix lengths, while the recommendation system shows a more pronounced improvement as the prefix length increases.
-This trend reveals a fundamental difference between the two components: while the classifier can maintain consistent predictive performance regardless of prefix length, the recommendation system requires a minimum threshold of contextual information before it can generate meaningful recommendations.
+Figure~\ref{fig:prefix_length_f1_statistics} compares the F1-score for the decision tree classifier and the recommendation system across different prefix lengths.
+The decision tree classifier maintains relatively stable performance, whereas the recommendation system exhibits marked improvement as prefix length increases.
+This trend highlights that, while outcome prediction can remain effective with short prefixes, meaningful recommendation generation requires a minimum threshold of contextual information.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{../media/prefix_length_f1_statistics.png}
