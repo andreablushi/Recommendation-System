@@ -33,6 +33,7 @@ To improve classification performance, hyperparameter optimization was conducted
 This tool systematically explores a predefined search space, iteratively testing combinations of critical hyperparameters—such as \textit{max\_depth}, \textit{max\_features}, and the split criterion (e.g., \textit{Gini} or \textit{entropy})—to identify the optimal configuration.
 For each configuration, the model was trained and evaluated using the $F_1$-score as the primary performance metric.
 The hyperparameter configuration yielding the highest $F_1$-score was selected as the final model.
+In addition, the search space for \textit{max\_depth} was restricted to comparatively small values in order to limit model complexity and reduce the risk of overfitting on the training set.
 
 To ensure reproducibility, a fixed random seed was set for all stochastic processes involved in the optimization and training phases.
 
@@ -58,7 +59,13 @@ To extract all positive paths from the decision tree, the decision tree is trave
 At each internal node, the corresponding feature, comparison operator (e.g., $\leq$, $>$), and threshold value were recorded.
 Upon reaching a leaf node labeled with a  positive outcome, the complete sequence of conditions along the path, together with its associated confidence score, was stored.
 \\\\To prevent the selection of statistically unrepresentative paths, a weighted confidence score was employed.
-This weighting incorporates the number of samples reaching each leaf node, thereby penalizing paths that achieve high confidence based on only a small number of observations.
+Let $n_{\text{leaf}}$ denote the number of training samples reaching a given positive leaf, $n_{\text{root}}$ the number of samples at the root node, and $p_{\text{pos}}$ the proportion of positive samples at that leaf.
+The confidence score $s$ associated with a positive path is defined as:
+\[
+    s \;=\; p_{\text{pos}} \cdot \frac{n_{\text{leaf}}}{n_{\text{root}}}.
+\]
+This definition combines the local confidence of the leaf (via $p_{\text{pos}}$) with its global context (via $n_{\text{leaf}}/n_{\text{root}}$).
+This penalizes paths that achieve high purity based on a negligible number of observations, thereby prioritizing paths that are both accurate and statistically significant.
 \\\\The Algorithm \ref{alg:get_positive_paths} formally defines the procedure for extracting positive paths from the decision tree.
 \begin{algorithm}[H]
     \label{alg:get_positive_paths}
@@ -85,7 +92,7 @@ This weighting incorporates the number of samples reaching each leaf node, there
 
 \paragraph{Filtering Compliant Paths:}
 For each trace prefix predicted as negative, the set of extracted positive paths was filtered to retain only those that are compliant with the observed activities.
-A path is defined as compliant if none of its feature conditions are violated along the path by the activities present in the trace prefix.
+A path is defined as compliant if none of its feature conditions are contradicted by the trace prefix, that is, if every condition along the path is either satisfied or refers to a feature that does not yet appear in the prefix.
 Among all compliant paths, the one with the highest confidence score was selected.
 In case of a tie in confidence, the shortest path was chosen as a secondary selection criterion.
 
