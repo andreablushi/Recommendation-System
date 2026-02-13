@@ -1,10 +1,20 @@
 # Recommendation System for Process Monitoring
 
 Implementation of **predictive process monitoring** and **prescriptive recommendations** using Decision Trees with Boolean encoding.
+<p align="center">
+  <img src="docs/media/preview.png" width="500" alt="Recommendation Tree Visualization">
+</p>
 
 This project was developed as part of the course "Process Mining and Management", held by Prof. Chiara Di Francescomarino at the University of Trento, within the Master's Degree in Computer Science.
 
-[View Full Report (PDF)](docs/report.pdf)
+<div align="center">
+    <a href="docs/report.pdf">
+        <img src="docs/media/report.png" alt="Report Preview" width="300px">
+    </a>
+    <br>
+    <a href="docs/report.pdf" style="display: block; margin-top: 10px; font-size: 15px; font-weight: bold; color: #007acc;">
+    View the report</a>
+</div>
 
 ## Table of Contents
 
